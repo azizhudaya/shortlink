@@ -1,0 +1,22 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.go]
+indent_style = tab
+
+[*.{yml,yaml,sql,json}]
+indent_style = space
+indent_size = 2
+
+[*.{ts,tsx,js,jsx,css,md}]
+indent_style = space
+indent_size = 2
+
+# Trailing whitespace is significant in Markdown line breaks.
+[*.md]
+trim_trailing_whitespace = false

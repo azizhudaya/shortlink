@@ -1,0 +1,75 @@
+# shortlink: both application containers for the afh.my.id shortlink service.
+#
+# One repo, two images, two independently deployable containers. Merging the
+# former shortlink-api and shortlink-web compose files into this one does NOT
+# couple their deploys — Compose takes a service argument:
+#
+#     docker compose up -d --build shortlink-api    # API only, web untouched
+#     docker compose up -d --build shortlink-web    # web only, redirects never interrupted
+#
+# That preserves the availability property the split repos were protecting
+# (a frontend release cannot interrupt the redirect path) while making a
+# change that spans API and UI a single atomic commit.
+#
+# Platform rules (registry: afh-infra/docs/NETWORKS.md):
+#   - `edge` and `data` are owned by afh-infra; declared external, never created here.
+#   - container_name values are unique across the host and registered in afh-infra.
+#   - No host ports, networks or database services here. Only Caddy publishes ports.
+
+networks:
+  edge:
+    external: true
+  data:
+    external: true
+
+services:
+  shortlink-api:
+    build:
+      context: ./api
+    image: ghcr.io/azizhudaya/shortlink-api:${GIT_SHA:-local}
+    container_name: shortlink-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://shortlink_api:${SHORTLINK_DB_PASSWORD}@postgres:5432/shortlink?sslmode=disable
+      PUBLIC_HOSTNAMES: afh.my.id,app.afh.my.id
+      PORT: "8080"
+    # The only container on both networks: edge for Caddy, data for Postgres.
+    networks: [edge, data]
+    mem_limit: 96m
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  shortlink-web:
+    build:
+      context: ./web
+    image: ghcr.io/azizhudaya/shortlink-web:${GIT_SHA:-local}
+    container_name: shortlink-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    # No `data` network: the web container has no path to Postgres.
+    networks: [edge]
+    mem_limit: 192m
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: 50
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

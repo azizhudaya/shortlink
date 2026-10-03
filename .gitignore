@@ -1,0 +1,24 @@
+# One .gitignore for the whole repo, so the secret rules are audited in one
+# place. This repo is public: a committed secret is the worst failure here.
+
+# ---- Secrets: runtime env lives only on the VPS, mode 0600 ----
+.env
+.env.*
+!.env.example
+
+# ---- api/ (Go) ----
+# `go build` in api/ drops a binary named after the module directory.
+api/shortlink-api
+api/api
+*.test
+*.out
+
+# ---- web/ (Next.js) ----
+web/node_modules/
+web/.next/
+web/out/
+web/next-env.d.ts
+web/tsconfig.tsbuildinfo
+
+# ---- macOS ----
+.DS_Store
