@@ -533,7 +533,8 @@ Consolidated from §6, in the order you will actually run them.
 - [ ] Story 3: all four acceptance criteria
 - [ ] `app.afh.my.id` UI works; no CORS errors or preflights in the console
 - [ ] External port scan re-run after app deploys
-- [ ] Create endpoint access decision from §9.1 applied
+- [ ] Create endpoint access decision from §9.1 applied: `app.afh.my.id` → 401
+      without credentials; `POST afh.my.id/api/links` → 404
 - [ ] `docker compose up -d --build shortlink-web` leaves the `shortlink-api`
       container's uptime untouched (`docker ps`) — the independent-deploy
       property §2.3 claims
@@ -546,7 +547,9 @@ Consolidated from §6, in the order you will actually run them.
    path and image names. If the actual GitHub account differs, update
    `api/go.mod`, the import paths across `api/`, and both `image:` lines in
    `docker-compose.yml`.
-2. **§9.1 stance** — how the create endpoint is protected during the M1
-   window. Needs deciding before step 6.4.2, not after.
+2. **§9.1 stance** — *decided:* Caddy basic auth on all of `app.afh.my.id`
+   (single operator credential, bcrypt hash in `afh-infra/.env`), `afh.my.id/api/*`
+   answered with 404 at the proxy, and `POST /api/links` requires
+   `Content-Type: application/json`. Removed when M2 enforces sessions on create.
 3. **Canary code** (§12.2 / glossary): M3's monitoring probes a permanent
    short code. Worth creating one during M1 and never deleting it.

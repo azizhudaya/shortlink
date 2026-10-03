@@ -35,12 +35,12 @@ it is not free to change.
 |---|---|---|
 | `GET` | `/{code}` | 302 to destination · 404 unknown · 410 disabled (FR-07) |
 | `GET` | `/healthz` | 200 with process + database reachability (FR-17) |
-| `POST` | `/api/links` | 201 created · 400 invalid · 409 alias taken |
+| `POST` | `/api/links` | 201 created · 400 invalid · 409 alias taken · 415 not JSON |
 
-Creation is **unauthenticated in M1** — authentication arrives with M2
-(Stories 4–6). See "Known gaps" in
-[`../docs/M1-IMPLEMENTATION-PLAN.md`](../docs/M1-IMPLEMENTATION-PLAN.md)
-before exposing this publicly.
+The API itself does not authenticate creation in M1 — that arrives with M2
+(Stories 4–6). Until then Caddy basic auth on `app.afh.my.id` restricts it
+(see the repo README and "Known gaps" in
+[`../docs/M1-IMPLEMENTATION-PLAN.md`](../docs/M1-IMPLEMENTATION-PLAN.md)).
 
 ## Local development
 

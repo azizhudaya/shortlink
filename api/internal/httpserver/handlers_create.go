@@ -3,6 +3,7 @@ package httpserver
 import (
 	"encoding/json"
 	"errors"
+	"mime"
 	"net/http"
 	"time"
 
@@ -28,7 +29,17 @@ type createResponse struct {
 //
 // NOTE: this endpoint is UNAUTHENTICATED until accounts are added. Do not
 // expose it to the public internet without an interim access restriction.
+// In M1 that restriction is Caddy basic auth on app.afh.my.id (afh-infra).
 func (s *Server) CreateLink(w http.ResponseWriter, r *http.Request) {
+	// Browsers attach cached basic-auth credentials to cross-site requests
+	// too. A plain HTML form cannot send application/json, and a cross-site
+	// fetch that does triggers a CORS preflight this API never answers — so
+	// requiring JSON stops other sites from creating links as the operator.
+	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+		writeError(w, http.StatusUnsupportedMediaType, CodeBadRequest, "Content-Type must be application/json.")
+		return
+	}
+
 	var req createRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, CodeBadRequest, "Request body must be valid JSON.")

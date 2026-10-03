@@ -56,11 +56,15 @@ does not rebuild or redeploy the other.
 |---|---|---|
 | `GET` | `/{code}` | 302 to destination · 404 unknown · 410 disabled (FR-07) |
 | `GET` | `/healthz` | 200 with process + database reachability (FR-17) |
-| `POST` | `/api/links` | 201 created · 400 invalid · 409 alias taken |
+| `POST` | `/api/links` | 201 created · 400 invalid · 409 alias taken · 415 not JSON |
 
-Creation is **unauthenticated in M1** — accounts arrive with M2 (Stories 4–6).
-Read "Known gaps" in `docs/M1-IMPLEMENTATION-PLAN.md` before exposing this
-publicly.
+Creation has no accounts in M1; accounts arrive with M2 (Stories 4–6). Until
+then, `app.afh.my.id` (UI and `/api/*`) sits behind **Caddy basic auth**
+configured in `afh-infra`, and `afh.my.id/api/*` returns 404 so the create
+endpoint cannot be reached around it. `POST /api/links` also requires
+`Content-Type: application/json` (415 otherwise), which stops other sites from
+using the operator's cached credentials. Remove the basic auth when M2 lands.
+See "Known gaps" in `docs/M1-IMPLEMENTATION-PLAN.md`.
 
 ## Hostname routing
 
