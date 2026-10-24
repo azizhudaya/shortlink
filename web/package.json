@@ -10,15 +10,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "15.5.22",
+    "next": "15.5.28",
     "qrcode": "1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
-  "//overrides": "sharp is an optional Next dependency used only by the Image Optimization API, which this app never touches (no next/image usage). Next 15.5.22 pins ^0.34.3, whose libvips advisories would otherwise ship in the runtime image. Pinned forward to a patched release rather than left vulnerable-but-unreachable.",
+  "//overrides": "sharp is an optional Next dependency used only by the Image Optimization API, which this app never touches (no next/image usage); it is pinned to a patched release rather than left vulnerable-but-unreachable. nanoid and source-map-js come in through postcss and are pinned to their patched releases for the same reason.",
   "overrides": {
-    "sharp": "0.35.3",
-    "postcss": "8.5.25"
+    "sharp": "0.35.5",
+    "postcss": "8.5.25",
+    "nanoid": "3.3.20",
+    "source-map-js": "1.2.2"
   },
   "devDependencies": {
     "@types/node": "22.10.0",
