@@ -60,7 +60,7 @@ func (s *Server) CreateLink(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, CodeInvalidAlias, err.Error())
 			return
 		}
-		link, err = s.store.CreateWithAlias(r.Context(), req.CustomAlias, longURL)
+		link, err = s.store.CreateWithAlias(r.Context(), 0, req.CustomAlias, longURL)
 		if errors.Is(err, store.ErrAliasTaken) {
 			// 409 with no substitute code.
 			writeError(w, http.StatusConflict, CodeAliasTaken,
@@ -68,7 +68,7 @@ func (s *Server) CreateLink(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		link, err = s.store.CreateWithGeneratedCode(r.Context(), longURL)
+		link, err = s.store.CreateWithGeneratedCode(r.Context(), 0, longURL)
 	}
 	if err != nil {
 		s.serverError(w, "creating link", err)
