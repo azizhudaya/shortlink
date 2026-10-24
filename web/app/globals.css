@@ -210,6 +210,11 @@ a.button:active {
   transform: scale(0.98);
 }
 
+/* Breathing room between the sign-in button and the line below it. */
+a.signin-cta {
+  margin-bottom: 1.25rem;
+}
+
 /* Nav (signed in only) on the left, theme toggle always on the right. */
 .topbar {
   max-width: 36rem;

@@ -39,7 +39,7 @@ export default function SignInPage() {
 
       {/* A plain link, not a fetch: sign-in is a full navigation to Google
           and works without JavaScript. */}
-      <a className="button" href="/api/auth/google/start">
+      <a className="button signin-cta" href="/api/auth/google/start">
         Continue with Google
         <span aria-hidden="true">→</span>
       </a>
