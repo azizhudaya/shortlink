@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { deleteLink, listLinks, setDisabled, type ApiResult, type LinkItem } from '@/lib/api';
@@ -47,6 +48,12 @@ function MyLinks() {
     async (after?: string) => {
       setLoading(true);
       const res = await handle(await listLinks(after));
+      // No links at all on arrival: send the user to Create instead of an
+      // empty page. Stays "loading" so nothing flashes before the redirect.
+      if (res.ok && !after && res.data.links.length === 0) {
+        router.replace('/');
+        return;
+      }
       setLoading(false);
       if (!res.ok) {
         setError(res.message);
@@ -56,7 +63,7 @@ function MyLinks() {
       setLinks((prev) => (after ? [...prev, ...res.data.links] : res.data.links));
       setCursor(res.data.next_cursor);
     },
-    [handle],
+    [handle, router],
   );
 
   useEffect(() => {
@@ -103,7 +110,12 @@ function MyLinks() {
           {error}
         </p>
       )}
-      {!loading && !error && links.length === 0 && <p className="hint">No links yet.</p>}
+      {/* Only reachable by deleting the last link here; an empty first load redirects to Create. */}
+      {!loading && !error && links.length === 0 && (
+        <p className="hint">
+          No links left. <Link href="/">Create one</Link>
+        </p>
+      )}
 
       <ul className="links">
         {links.map((link) => (
