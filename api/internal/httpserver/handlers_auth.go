@@ -106,7 +106,9 @@ func (s *Server) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	s.setCookie(w, s.sessionCookieName(), token, sessionMaxAge)
 	s.logger.Info("sign-in", "user_id", u.ID, "created", created)
-	http.Redirect(w, r, "/links", http.StatusFound)
+	// The marker tells My links this is a fresh sign-in, so a user with no
+	// links yet can be sent on to Create (the browser sends no referrer).
+	http.Redirect(w, r, "/links?from=signin", http.StatusFound)
 }
 
 // Logout handles POST /api/auth/logout.

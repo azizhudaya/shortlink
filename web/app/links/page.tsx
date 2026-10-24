@@ -48,11 +48,15 @@ function MyLinks() {
     async (after?: string) => {
       setLoading(true);
       const res = await handle(await listLinks(after));
-      // No links at all on arrival: send the user to Create instead of an
-      // empty page. Stays "loading" so nothing flashes before the redirect.
-      if (res.ok && !after && res.data.links.length === 0) {
-        router.replace('/');
-        return;
+      // Straight after sign-in with no links yet, go on to Create. Opened any
+      // other way, an empty list is shown. The marker is read once and then
+      // dropped from the address bar, so a reload is an ordinary visit.
+      if (!after && fromSignIn()) {
+        if (res.ok && res.data.links.length === 0) {
+          router.replace('/');
+          return; // stays "loading": nothing flashes before the redirect
+        }
+        router.replace('/links');
       }
       setLoading(false);
       if (!res.ok) {
@@ -110,10 +114,9 @@ function MyLinks() {
           {error}
         </p>
       )}
-      {/* Only reachable by deleting the last link here; an empty first load redirects to Create. */}
       {!loading && !error && links.length === 0 && (
         <p className="hint">
-          No links left. <Link href="/">Create one</Link>
+          No links yet. <Link href="/">Create one</Link>
         </p>
       )}
 
@@ -264,6 +267,12 @@ function TrashIcon() {
       <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
     </svg>
   );
+}
+
+// The sign-in callback lands on /links?from=signin. Read from window rather
+// than useSearchParams, which would need a Suspense boundary on this page.
+function fromSignIn(): boolean {
+  return new URLSearchParams(window.location.search).get('from') === 'signin';
 }
 
 // Host plus a truncated path; the full URL is in the title attribute.

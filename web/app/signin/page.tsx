@@ -28,7 +28,7 @@ export default function SignInPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (status === 'authed') router.replace('/links');
+    if (status === 'authed') router.replace('/links?from=signin');
   }, [status, router]);
 
   return (

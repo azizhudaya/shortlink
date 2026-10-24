@@ -231,7 +231,7 @@ func wantLocation(t *testing.T, resp *http.Response, want string) {
 func TestFirstSignInCreatesAccount(t *testing.T) {
 	e := newEnv(t)
 	resp := e.signIn(t, "sub-1", "one@example.com")
-	wantLocation(t, resp, "/links")
+	wantLocation(t, resp, "/links?from=signin")
 
 	c := cookieNamed(resp, "__Host-sl_session")
 	if c == nil || !c.HttpOnly || !c.Secure || c.SameSite != http.SameSiteLaxMode || c.Path != "/" ||
@@ -256,8 +256,8 @@ func TestFirstSignInCreatesAccount(t *testing.T) {
 
 func TestSecondSignInSameAccount(t *testing.T) {
 	e := newEnv(t)
-	wantLocation(t, e.signIn(t, "sub-1", "one@example.com"), "/links")
-	wantLocation(t, e.signIn(t, "sub-1", "one@example.com"), "/links")
+	wantLocation(t, e.signIn(t, "sub-1", "one@example.com"), "/links?from=signin")
+	wantLocation(t, e.signIn(t, "sub-1", "one@example.com"), "/links?from=signin")
 	if n := e.count(t, `SELECT count(*) FROM users`); n != 1 {
 		t.Fatalf("users = %d, want 1", n)
 	}
@@ -276,7 +276,7 @@ func TestSignupsClosed(t *testing.T) {
 	if n := e.count(t, `SELECT count(*) FROM users WHERE google_sub = 'newcomer'`); n != 0 {
 		t.Fatal("closed sign-ups created a user")
 	}
-	wantLocation(t, e.signIn(t, "existing", "old@example.com"), "/links")
+	wantLocation(t, e.signIn(t, "existing", "old@example.com"), "/links?from=signin")
 }
 
 func TestUnverifiedEmail(t *testing.T) {
@@ -291,7 +291,7 @@ func TestUnverifiedEmail(t *testing.T) {
 
 func TestDisabledAccount(t *testing.T) {
 	e := newEnv(t)
-	wantLocation(t, e.signIn(t, "sub-1", "one@example.com"), "/links")
+	wantLocation(t, e.signIn(t, "sub-1", "one@example.com"), "/links?from=signin")
 	if _, _, _, err := e.store.BanUser(context.Background(), "one@example.com", "aziz", "test"); err != nil {
 		t.Fatal(err)
 	}
