@@ -10,7 +10,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// GoogleIssuer is what main passes to NewGoogle. Tests pass a fake (D18).
+// GoogleIssuer is the issuer Google's ID tokens carry.
 const GoogleIssuer = "https://accounts.google.com"
 
 var (
@@ -34,13 +34,40 @@ type Google struct {
 	verifier *oidc.IDTokenVerifier
 }
 
-// NewGoogle fetches the issuer's discovery document. The context also governs
-// the key set's later refreshes, so main passes a long-lived one.
+// Google's published endpoints, as listed by
+// https://accounts.google.com/.well-known/openid-configuration.
+const (
+	googleAuthURL  = "https://accounts.google.com/o/oauth2/v2/auth"
+	googleTokenURL = "https://oauth2.googleapis.com/token"
+	googleJWKSURL  = "https://www.googleapis.com/oauth2/v3/certs"
+)
+
+// NewGoogleStatic is what main uses: Google's endpoints are fixed, so nothing
+// is fetched at startup and the API (which also serves redirects) boots even
+// when Google is unreachable. Signing keys are fetched on first verification.
+// The context governs those later key fetches, so main passes a long-lived one.
+func NewGoogleStatic(ctx context.Context, clientID, clientSecret, redirectURL string) *Google {
+	provider := (&oidc.ProviderConfig{
+		IssuerURL:  GoogleIssuer,
+		AuthURL:    googleAuthURL,
+		TokenURL:   googleTokenURL,
+		JWKSURL:    googleJWKSURL,
+		Algorithms: []string{oidc.RS256},
+	}).NewProvider(ctx)
+	return newGoogle(provider, clientID, clientSecret, redirectURL)
+}
+
+// NewGoogle fetches the issuer's discovery document first. Tests use it to
+// point the client at a fake provider (D18).
 func NewGoogle(ctx context.Context, issuerURL, clientID, clientSecret, redirectURL string) (*Google, error) {
 	provider, err := oidc.NewProvider(ctx, issuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("oidc discovery: %w", err)
 	}
+	return newGoogle(provider, clientID, clientSecret, redirectURL), nil
+}
+
+func newGoogle(provider *oidc.Provider, clientID, clientSecret, redirectURL string) *Google {
 	return &Google{
 		oauth: oauth2.Config{
 			ClientID:     clientID,
@@ -52,7 +79,7 @@ func NewGoogle(ctx context.Context, issuerURL, clientID, clientSecret, redirectU
 			Scopes: []string{oidc.ScopeOpenID, "email"},
 		},
 		verifier: provider.Verifier(&oidc.Config{ClientID: clientID}),
-	}, nil
+	}
 }
 
 func (g *Google) AuthURL(fs FlowState) string {

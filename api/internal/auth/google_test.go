@@ -130,3 +130,24 @@ func TestAuthURLParams(t *testing.T) {
 		t.Errorf("access_type = %q: no refresh token is ever requested", q.Get("access_type"))
 	}
 }
+
+// Startup must not depend on reaching Google: the same process serves
+// redirects, which never need sign-in. A cancelled context proves the
+// constructor makes no request.
+func TestNewGoogleStaticNeedsNoNetwork(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	g := NewGoogleStatic(ctx, "client-id", "secret", testRedirect)
+
+	fs, _ := NewFlowState()
+	u, err := url.Parse(g.AuthURL(fs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := u.Scheme + "://" + u.Host + u.Path; got != "https://accounts.google.com/o/oauth2/v2/auth" {
+		t.Fatalf("auth endpoint = %q", got)
+	}
+	if u.Query().Get("client_id") != "client-id" || u.Query().Get("code_challenge_method") != "S256" {
+		t.Fatalf("auth URL = %s", u)
+	}
+}

@@ -83,12 +83,9 @@ func serve(logger *slog.Logger) {
 	}
 	defer pool.Close()
 
-	google, err := auth.NewGoogle(context.Background(), auth.GoogleIssuer,
+	// No network at startup: a Google outage must not keep redirects down.
+	google := auth.NewGoogleStatic(context.Background(),
 		cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL)
-	if err != nil {
-		logger.Error("google sign-in setup", "error", err)
-		os.Exit(1)
-	}
 	checker := safety.NewSafeBrowsing(safety.Endpoint, cfg.SafeBrowsingAPIKey, &http.Client{Timeout: 3 * time.Second})
 
 	st := store.NewPostgres(pool)
