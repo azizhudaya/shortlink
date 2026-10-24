@@ -1,7 +1,7 @@
 # Static binary in a distroless nonroot image: near-zero
 # attack surface, ~25 MB resident.
 
-FROM golang:1.22-alpine AS build
+FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

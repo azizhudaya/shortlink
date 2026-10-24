@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,11 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	migratepgx "github.com/golang-migrate/migrate/v4/database/pgx/v5"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx/v5" sql driver
 
 	"github.com/azizhudaya/shortlink/api/internal/config"
 	"github.com/azizhudaya/shortlink/api/internal/httpserver"
@@ -38,7 +33,7 @@ func main() {
 	// new code and old schema, can coexist. A rollback to an image that does
 	// not match the live schema fails visibly at boot rather than serving
 	// wrong data.
-	if err := runMigrations(cfg.DatabaseURL); err != nil {
+	if err := migrations.Up(cfg.DatabaseURL); err != nil {
 		logger.Error("running migrations", "error", err)
 		os.Exit(1)
 	}
@@ -81,31 +76,4 @@ func main() {
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "error", err)
 	}
-}
-
-func runMigrations(databaseURL string) error {
-	src, err := iofs.New(migrations.FS, ".")
-	if err != nil {
-		return err
-	}
-
-	db, err := sql.Open("pgx/v5", databaseURL)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	driver, err := migratepgx.WithInstance(db, &migratepgx.Config{})
-	if err != nil {
-		return err
-	}
-
-	m, err := migrate.NewWithInstance("iofs", src, "pgx5", driver)
-	if err != nil {
-		return err
-	}
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return err
-	}
-	return nil
 }
