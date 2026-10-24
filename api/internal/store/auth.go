@@ -42,7 +42,7 @@ type AuthStore interface {
 	PurgeExpired(ctx context.Context) error
 	// D26. One tx: is_active=false, delete sessions, take down every link not
 	// already taken down. ErrNotFound, ErrAmbiguousEmail.
-	BanUser(ctx context.Context, email, actor, reason string) (linksTakenDown int, sessionsDeleted int, err error)
+	BanUser(ctx context.Context, email, actor, reason string) (u model.User, linksTakenDown int, sessionsDeleted int, err error)
 	ListRecentUsers(ctx context.Context, since time.Time) ([]RecentUser, error)
 	// D28. is_active=true; links stay taken down. ErrNotFound, ErrAmbiguousEmail.
 	EnableUser(ctx context.Context, email string) (model.User, error)

@@ -33,6 +33,13 @@ services:
       DATABASE_URL: postgres://shortlink_api:${SHORTLINK_DB_PASSWORD}@postgres:5432/shortlink?sslmode=disable
       PUBLIC_HOSTNAMES: afh.my.id,app.afh.my.id
       PORT: "8080"
+      # Secrets come only from /srv/shortlink/.env (0600); never committed (D17).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SAFE_BROWSING_API_KEY: ${SAFE_BROWSING_API_KEY}
+      # Sign-up kill switch (D25): set SIGNUPS_OPEN=false in .env, then
+      # `docker compose up -d shortlink-api`. Existing accounts keep working.
+      SIGNUPS_OPEN: ${SIGNUPS_OPEN:-true}
     # The only container on both networks: edge for Caddy, data for Postgres.
     networks: [edge, data]
     mem_limit: 96m

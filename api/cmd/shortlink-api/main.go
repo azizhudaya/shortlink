@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,6 +26,33 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
+	cmd := "serve"
+	if len(os.Args) > 1 {
+		cmd = os.Args[1]
+	}
+	var err error
+	switch cmd {
+	case "serve":
+		serve(logger)
+		return
+	case "takedown":
+		err = runTakedown(os.Args[2:], os.Stdout)
+	case "user":
+		err = runUser(os.Args[2:], os.Stdout)
+	default:
+		err = fmt.Errorf("%w: unknown command %q", errUsage, cmd)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		if errors.Is(err, errUsage) {
+			fmt.Fprint(os.Stderr, usageText)
+			os.Exit(2)
+		}
+		os.Exit(1)
+	}
+}
+
+func serve(logger *slog.Logger) {
 	cfg := config.Load()
 	if cfg.DatabaseURL == "" {
 		logger.Error("DATABASE_URL is required")
@@ -64,6 +92,11 @@ func main() {
 	st := store.NewPostgres(pool)
 	srv := httpserver.NewServer(cfg, st, st, google, checker, logger)
 
+	// Background jobs share one context, cancelled on shutdown.
+	jobs, stopJobs := context.WithCancel(context.Background())
+	defer stopJobs()
+	go purgeLoop(jobs, st, logger)
+
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           srv.Routes(),
@@ -87,9 +120,26 @@ func main() {
 	<-stop
 
 	logger.Info("shutting down")
+	stopJobs()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "error", err)
+	}
+}
+
+// purgeLoop deletes expired sessions and aged-out quota rows hourly (D14).
+func purgeLoop(ctx context.Context, st *store.Postgres, logger *slog.Logger) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if err := st.PurgeExpired(ctx); err != nil && ctx.Err() == nil {
+				logger.Error("purging expired rows", "error", err)
+			}
+		}
 	}
 }

@@ -98,7 +98,7 @@ func TestUpsertSignupsClosed(t *testing.T) {
 func TestUpsertDisabledUserNotRecreated(t *testing.T) {
 	st, pool := newTestStore(t)
 	mustUser(t, st, "sub-a", "a@example.com")
-	if _, _, err := st.BanUser(ctx, "a@example.com", "aziz", "spam"); err != nil {
+	if _, _, _, err := st.BanUser(ctx, "a@example.com", "aziz", "spam"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -199,9 +199,9 @@ func TestBanUserCascades(t *testing.T) {
 	_ = st.CreateSession(ctx, []byte("s2"), id, time.Now().Add(time.Hour), "", "")
 	_ = st.CreateSession(ctx, []byte("s3"), other, time.Now().Add(time.Hour), "", "")
 
-	links, sessions, err := st.BanUser(ctx, "a@example.com", "aziz", "phishing")
-	if err != nil || links != 3 || sessions != 2 {
-		t.Fatalf("BanUser = %d links, %d sessions, err %v; want 3, 2", links, sessions, err)
+	u, links, sessions, err := st.BanUser(ctx, "a@example.com", "aziz", "phishing")
+	if err != nil || links != 3 || sessions != 2 || u.ID != id || u.IsActive {
+		t.Fatalf("BanUser = %+v, %d links, %d sessions, err %v; want user %d inactive, 3, 2", u, links, sessions, err, id)
 	}
 	if n := count(t, pool, `SELECT count(*) FROM links WHERE user_id = $1 AND disabled_at IS NOT NULL
 		AND disabled_by = 'operator:aziz' AND disable_reason = 'phishing'`, id); n != 3 {
@@ -220,7 +220,7 @@ func TestBanUserCascades(t *testing.T) {
 
 func TestBanUnknownEmail(t *testing.T) {
 	st, _ := newTestStore(t)
-	if _, _, err := st.BanUser(ctx, "nobody@example.com", "aziz", "x"); !errors.Is(err, ErrNotFound) {
+	if _, _, _, err := st.BanUser(ctx, "nobody@example.com", "aziz", "x"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err = %v, want ErrNotFound", err)
 	}
 }
@@ -230,7 +230,7 @@ func TestBanAmbiguousEmailChangesNothing(t *testing.T) {
 	mustUser(t, st, "sub-a", "same@example.com")
 	mustUser(t, st, "sub-b", "same@example.com")
 
-	if _, _, err := st.BanUser(ctx, "same@example.com", "aziz", "x"); !errors.Is(err, ErrAmbiguousEmail) {
+	if _, _, _, err := st.BanUser(ctx, "same@example.com", "aziz", "x"); !errors.Is(err, ErrAmbiguousEmail) {
 		t.Fatalf("err = %v, want ErrAmbiguousEmail", err)
 	}
 	if n := count(t, pool, `SELECT count(*) FROM users WHERE is_active`); n != 2 {
@@ -263,7 +263,7 @@ func TestEnableUserKeepsLinksDown(t *testing.T) {
 	insertLink(t, pool, "l1", id, nil)
 	insertLink(t, pool, "l2", id, nil)
 	insertLink(t, pool, "l3", id, nil)
-	if _, _, err := st.BanUser(ctx, "a@example.com", "aziz", "spam"); err != nil {
+	if _, _, _, err := st.BanUser(ctx, "a@example.com", "aziz", "spam"); err != nil {
 		t.Fatal(err)
 	}
 

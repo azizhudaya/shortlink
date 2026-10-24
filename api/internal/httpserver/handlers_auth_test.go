@@ -273,7 +273,7 @@ func TestUnverifiedEmail(t *testing.T) {
 func TestDisabledAccount(t *testing.T) {
 	e := newEnv(t)
 	wantLocation(t, e.signIn(t, "sub-1", "one@example.com"), "/links")
-	if _, _, err := e.store.BanUser(context.Background(), "one@example.com", "aziz", "test"); err != nil {
+	if _, _, _, err := e.store.BanUser(context.Background(), "one@example.com", "aziz", "test"); err != nil {
 		t.Fatal(err)
 	}
 

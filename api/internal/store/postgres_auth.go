@@ -100,12 +100,17 @@ func (p *Postgres) PurgeExpired(ctx context.Context) error {
 	return err
 }
 
-func (p *Postgres) BanUser(ctx context.Context, email, actor, reason string) (int, int, error) {
+func (p *Postgres) BanUser(ctx context.Context, email, actor, reason string) (model.User, int, int, error) {
 	id, err := p.resolveEmail(ctx, email, "is_active")
 	if err != nil {
-		return 0, 0, err
+		return model.User{}, 0, 0, err
 	}
-	return p.banUserByID(ctx, id, "operator:"+actor, reason)
+	links, sessions, err := p.banUserByID(ctx, id, "operator:"+actor, reason)
+	if err != nil {
+		return model.User{}, 0, 0, err
+	}
+	u, err := scanUser(p.pool.QueryRow(ctx, `SELECT `+userCols+` FROM users WHERE id = $1`, id))
+	return u, links, sessions, err
 }
 
 // banUserByID is the D26 cascade. Owner-disabled links are taken down too, so
