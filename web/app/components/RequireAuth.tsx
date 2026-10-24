@@ -16,9 +16,10 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
 
   if (status !== 'authed') {
     return (
-      <p className="wrap hint" aria-live="polite">
+      <div className="page-loading" role="status">
+        <span className="spinner" aria-hidden="true" />
         Loading…
-      </p>
+      </div>
     );
   }
   return <>{children}</>;
