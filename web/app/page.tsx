@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createLink, type CreateResponse } from '@/lib/api';
+import QrCode from './components/QrCode';
 import RequireAuth from './components/RequireAuth';
 
 export default function Page() {
@@ -102,6 +103,7 @@ function CreateForm() {
           <button type="button" className="outline" onClick={onCopy}>
             {copied ? 'Copied' : 'Copy'}
           </button>
+          <QrCode key={result.short_url} shortUrl={result.short_url} />
         </div>
       )}
     </div>

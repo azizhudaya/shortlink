@@ -128,6 +128,7 @@ The person running the service. Deploys releases, responds to abuse reports, res
 - Server-side sessions, logout, and CSRF protection
 - Link creation requires authentication; links are stamped with an owner
 - Per-user link listing, disable, and delete
+- QR code for each short link, downloadable as PNG and SVG
 - Abuse controls replacing closed registration: Safe Browsing check on create, hourly Safe Browsing re-scan with auto-takedown, new-account daily quota, sign-up kill switch, one-command account ban and unban, whitelist for trusted users
 
 **Milestone 3 — Production readiness (GA gate)**
@@ -143,7 +144,6 @@ The person running the service. Deploys releases, responds to abuse reports, res
 |---|---|
 | Click analytics and counters | Adds a write on the hottest path and a caching layer to keep it fast. The redirect stays a single indexed read in this release. 302 preserves the option (§9.2). |
 | Link expiry and scheduled deactivation | Manual disable covers the real need. Revisit if a use case appears. |
-| QR code generation | Any external generator handles this. No reason to own it. |
 | Bulk import/export | Not needed at expected link volume. |
 | Password-protected or one-time links | Meaningful additional threat surface for a use case that has not come up. |
 | Email + password accounts | Users won't create another password; Google sign-in is the only identity method (v2.1). |
@@ -357,6 +357,7 @@ So that an abusive destination stops resolving before it damages the domain's re
 | FR-22 | Hourly Safe Browsing re-scan of the last 30 days of active links, with auto-takedown and auto-ban of new or repeat-offender owners | P0 |
 | FR-23 | Operator can lift a ban; links taken down by it stay down until reviewed | P1 |
 | FR-24 | Whitelisted users have no daily quota; all other controls still apply | P1 |
+| FR-25 | Owner can show a QR code for any of their links that isn't taken down, and download it as PNG and SVG; it encodes only the short URL and is generated in the browser | P1 |
 
 ### 5.5 Non-functional requirements
 
@@ -983,5 +984,5 @@ Stated explicitly so they are not rediscovered later as surprises.
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-07-30 | Initial document. Scoped M0—M2, framed as a learning project with learning-verification gates. |
-| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), FR-18–FR-24, schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
+| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
 | 2.0 | 2026-07-31 | Reframed as a product release. Learning framing and verification gates removed. Added: system architecture with the repository model, platform contract, and resource budget (§7), delivery pipeline (§11), operations with SLOs, backup, and runbook (§12), abuse and acceptable use (§13), privacy under UU PDP (§14), M3 GA gate with pre-launch checklist (§15), expanded security requirements (§10), takedown story and disable fields in the schema. Availability target set at 99.5% with rationale. |

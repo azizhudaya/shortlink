@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { deleteLink, listLinks, setDisabled, type ApiResult, type LinkItem } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import QrCode from '../components/QrCode';
 import RequireAuth from '../components/RequireAuth';
 
 export default function LinksPage() {
@@ -175,6 +176,8 @@ function LinkRow({
           </>
         )}
       </div>
+      {/* No QR for a taken-down link: it would only lead to a 410 page. */}
+      {link.status !== 'taken_down' && <QrCode shortUrl={link.short_url} />}
     </li>
   );
 }
