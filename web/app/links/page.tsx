@@ -77,7 +77,7 @@ function MyLinks() {
   }
 
   async function onDelete(link: LinkItem) {
-    if (!window.confirm(`Delete ${link.short_url}? The code becomes available to anyone.`)) return;
+    if (!window.confirm(`Delete ${link.short_url}? It will stop working, and this code can't be used again.`)) return;
     setBusy(link.code);
     const res = await handle(await deleteLink(link.code));
     setBusy(null);

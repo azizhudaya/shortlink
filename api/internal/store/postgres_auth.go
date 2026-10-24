@@ -128,7 +128,7 @@ func (p *Postgres) BanUserByID(ctx context.Context, id int64, disabledBy, reason
 		sessions = int(tag.RowsAffected())
 		tag, err = tx.Exec(ctx,
 			`UPDATE links SET disabled_at = now(), disabled_by = $2, disable_reason = $3
-			 WHERE user_id = $1 AND (disabled_at IS NULL OR disabled_by LIKE 'user:%')`,
+			 WHERE user_id = $1 AND deleted_at IS NULL AND (disabled_at IS NULL OR disabled_by LIKE 'user:%')`,
 			id, disabledBy, reason)
 		if err != nil {
 			return err

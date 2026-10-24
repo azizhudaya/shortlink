@@ -85,8 +85,9 @@ func (s *Server) PatchLink(w http.ResponseWriter, r *http.Request) {
 	s.writeOwnerResult(w, "updating link", err)
 }
 
-// DeleteLink handles DELETE /api/links/{code} (session → CSRF). The code
-// becomes available to anyone.
+// DeleteLink handles DELETE /api/links/{code} (session → CSRF). It is a soft
+// delete: the link 404s and leaves the list, and its code stays reserved so
+// printed links and QR codes can't be taken over (D31).
 func (s *Server) DeleteLink(w http.ResponseWriter, r *http.Request) {
 	err := s.store.DeleteByOwner(r.Context(), sessionFrom(r.Context()).UserID, r.PathValue("code"))
 	s.writeOwnerResult(w, "deleting link", err)

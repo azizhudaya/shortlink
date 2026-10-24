@@ -327,7 +327,7 @@ func TestDisableThenRedirect410ThenEnable302(t *testing.T) {
 		http.StatusUnsupportedMediaType, CodeBadRequest)
 }
 
-func TestDeleteThenRedirect404AndAliasReusable(t *testing.T) {
+func TestDeleteThenRedirect404AndCodeStaysReserved(t *testing.T) {
 	e := newEnv(t)
 	a, b := e.account(t, "a"), e.account(t, "b")
 	e.mustCreate(t, a, `{"url":"https://example.com","custom_alias":"mine"}`)
@@ -338,7 +338,11 @@ func TestDeleteThenRedirect404AndAliasReusable(t *testing.T) {
 	if got := e.redirectStatus(t, "mine"); got != http.StatusNotFound {
 		t.Fatalf("deleted redirect: %d, want 404", got)
 	}
-	e.mustCreate(t, b, `{"url":"https://example.com/b","custom_alias":"mine"}`)
+	if got := e.list(t, a, ""); len(got.Links) != 0 {
+		t.Fatalf("deleted link still listed: %+v", got.Links)
+	}
+	wantError(t, e.send(t, a, "DELETE", "/api/links/mine", ""), http.StatusNotFound, CodeNotFound)
+	wantError(t, e.create(t, b, `{"url":"https://example.com/b","custom_alias":"mine"}`), http.StatusConflict, CodeAliasTaken)
 }
 
 func TestTakenDownLinkOwnerCannotEnableOrDelete(t *testing.T) {

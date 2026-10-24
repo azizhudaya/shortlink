@@ -98,6 +98,9 @@ down: look at that user's links and `user disable` them if abusive. Set
 `rescan stopped: safe browsing unavailable` warnings mean the key or its quota
 needs attention.
 
+**Restore a deleted link** (D31): owner deletes are soft, so the row is still there:
+`UPDATE links SET deleted_at = NULL WHERE short_code = 'X';`
+
 **Claim the M1 links** (D16, once): after the operator's first sign-in,
 `UPDATE links SET user_id = <your id> WHERE user_id IS NULL;`
 

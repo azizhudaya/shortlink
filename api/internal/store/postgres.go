@@ -31,19 +31,19 @@ func NewPostgres(pool *pgxpool.Pool) *Postgres {
 }
 
 const linkCols = `short_code, long_url, is_custom, user_id,
-	          disabled_at, disabled_by, disable_reason, created_at`
+	          disabled_at, disabled_by, disable_reason, created_at, deleted_at`
 
 const insertSQL = `
 	INSERT INTO links (short_code, long_url, is_custom, user_id)
 	VALUES ($1, $2, $3, $4)
-	RETURNING short_code, long_url, is_custom, user_id,
-	          disabled_at, disabled_by, disable_reason, created_at`
+	RETURNING ` + linkCols
 
+// A soft-deleted link is gone for every reader: the redirect answers 404.
+// Its row keeps the code reserved (D31).
 const selectSQL = `
-	SELECT short_code, long_url, is_custom, user_id,
-	       disabled_at, disabled_by, disable_reason, created_at
+	SELECT ` + linkCols + `
 	FROM links
-	WHERE short_code = $1`
+	WHERE short_code = $1 AND deleted_at IS NULL`
 
 func (p *Postgres) CreateWithGeneratedCode(ctx context.Context, userID int64, longURL string) (model.Link, error) {
 	for attempt := 0; attempt < MaxGenerateAttempts; attempt++ {
@@ -120,7 +120,7 @@ func (p *Postgres) ListByOwner(ctx context.Context, userID int64, cursor string,
 	// limit+1 rows tell us whether another page exists without a count.
 	rows, err := p.pool.Query(ctx, `
 		SELECT `+linkCols+` FROM links
-		WHERE user_id = $1
+		WHERE user_id = $1 AND deleted_at IS NULL
 		  AND ($2::timestamptz IS NULL OR (created_at, short_code) < ($2, $3))
 		ORDER BY created_at DESC, short_code DESC
 		LIMIT $4`, userID, after, afterCode, limit+1)
@@ -177,10 +177,10 @@ const ownerEditable = `(disabled_at IS NULL OR COALESCE(disabled_by LIKE 'user:%
 
 func (p *Postgres) SetDisabledByOwner(ctx context.Context, userID int64, code string, disabled bool) error {
 	sql := `UPDATE links SET disabled_at = NULL, disabled_by = NULL, disable_reason = NULL
-	        WHERE short_code = $2 AND user_id = $1 AND disabled_by LIKE 'user:%'`
+	        WHERE short_code = $2 AND user_id = $1 AND deleted_at IS NULL AND disabled_by LIKE 'user:%'`
 	if disabled {
 		sql = `UPDATE links SET disabled_at = now(), disabled_by = 'user:' || $1::text, disable_reason = NULL
-		       WHERE short_code = $2 AND user_id = $1 AND disabled_at IS NULL`
+		       WHERE short_code = $2 AND user_id = $1 AND deleted_at IS NULL AND disabled_at IS NULL`
 	}
 	tag, err := p.pool.Exec(ctx, sql, userID, code)
 	if err != nil || tag.RowsAffected() == 1 {
@@ -191,7 +191,8 @@ func (p *Postgres) SetDisabledByOwner(ctx context.Context, userID int64, code st
 
 func (p *Postgres) DeleteByOwner(ctx context.Context, userID int64, code string) error {
 	tag, err := p.pool.Exec(ctx,
-		`DELETE FROM links WHERE short_code = $2 AND user_id = $1 AND `+ownerEditable, userID, code)
+		`UPDATE links SET deleted_at = now()
+		 WHERE short_code = $2 AND user_id = $1 AND deleted_at IS NULL AND `+ownerEditable, userID, code)
 	if err != nil {
 		return err
 	}
@@ -209,7 +210,7 @@ func (p *Postgres) DeleteByOwner(ctx context.Context, userID int64, code string)
 func (p *Postgres) whyUnchanged(ctx context.Context, userID int64, code string) error {
 	var editable bool
 	err := p.pool.QueryRow(ctx,
-		`SELECT `+ownerEditable+` FROM links WHERE short_code = $2 AND user_id = $1`, userID, code).Scan(&editable)
+		`SELECT `+ownerEditable+` FROM links WHERE short_code = $2 AND user_id = $1 AND deleted_at IS NULL`, userID, code).Scan(&editable)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return ErrNotFound
@@ -256,7 +257,7 @@ func scanLink(row scannable) (model.Link, error) {
 	var l model.Link
 	err := row.Scan(
 		&l.ShortCode, &l.LongURL, &l.IsCustom, &l.UserID,
-		&l.DisabledAt, &l.DisabledBy, &l.DisableReason, &l.CreatedAt,
+		&l.DisabledAt, &l.DisabledBy, &l.DisableReason, &l.CreatedAt, &l.DeletedAt,
 	)
 	return l, err
 }

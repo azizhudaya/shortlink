@@ -54,7 +54,9 @@ type Store interface {
 	// SetDisabledByOwner is idempotent. ErrNotFound, ErrTakenDown.
 	SetDisabledByOwner(ctx context.Context, userID int64, code string, disabled bool) error
 
-	// DeleteByOwner frees the code. ErrNotFound, ErrTakenDown.
+	// DeleteByOwner soft-deletes (D31): the link stops working and disappears
+	// from the owner's list, but its code stays reserved. ErrNotFound,
+	// ErrTakenDown.
 	DeleteByOwner(ctx context.Context, userID int64, code string) error
 
 	// Takedown disables any link as operator:<actor> (D4). ErrNotFound.

@@ -31,7 +31,9 @@ export default function PrivacyPage() {
         Shortlink stores the destination URL, the short code, and when you created it, linked to your account. To keep
         the service free of phishing and malware, every destination is checked against Google Safe Browsing when you
         create it and again periodically for 30 days; the destination URL is sent to Google for that check. A count of
-        the links you created in the last 24 hours is kept to enforce the daily limit.
+        the links you created in the last 24 hours is kept to enforce the daily limit. When you delete a link it stops
+        working and leaves your list, but its record is kept so the code can never be reused by someone else (for
+        example on a printed QR code); asking for your data to be deleted removes it completely.
       </p>
 
       <h2>When someone opens a short link</h2>

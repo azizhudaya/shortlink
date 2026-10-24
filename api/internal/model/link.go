@@ -19,6 +19,7 @@ type Link struct {
 	DisabledBy    *string
 	DisableReason *string
 	CreatedAt     time.Time
+	DeletedAt     *time.Time // owner deletion is soft (D31); the store hides these rows
 }
 
 // IsDisabled reports whether the redirect handler should return 410

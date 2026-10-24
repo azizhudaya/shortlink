@@ -288,7 +288,7 @@ So that I have a real inventory rather than a set of links I have lost track of.
 - [ ] Given a valid session, when the list is requested, then only that user's links are returned, newest first
 - [ ] Given more than 50 links, when the list is requested, then results are paginated
 - [ ] Given a link is disabled, when its code is followed, then 410 is returned and the code remains reserved (not reusable)
-- [ ] Given a link is deleted, when the operation completes, then the row is removed and the code becomes available again
+- [ ] Given a link is deleted, when the operation completes, then it returns 404 and leaves the owner's list, and its code stays reserved (soft delete, v2.1)
 - [ ] Given a delete action, when triggered in the UI, then a confirmation is required
 
 **Priority:** P0 Â· **Effort:** M
@@ -560,7 +560,8 @@ create table links (
     disabled_at   timestamptz,
     disabled_by   text,
     disable_reason text,
-    created_at    timestamptz not null default now()
+    created_at    timestamptz not null default now(),
+    deleted_at    timestamptz                 -- owner soft delete (v2.1)
 );
 create index links_user_id_created_at_idx on links (user_id, created_at desc, short_code desc);
 
@@ -581,7 +582,7 @@ create index link_creations_user_time_idx on link_creations (user_id, created_at
 
 **`user_id` is nullable** so Milestone 1 links created before accounts exist survive the Milestone 2 migration without a backfill or a breaking change.
 
-**`disabled_at` rather than deletion for takedowns.** A disabled code stays in the table, so it cannot be re-registered by whoever caused the takedown. Owner-initiated deletion does remove the row and free the code — different intent, different mechanism.
+**`disabled_at` rather than deletion for takedowns.** A disabled code stays in the table, so it cannot be re-registered by whoever caused the takedown. Owner-initiated deletion is a soft delete as of v2.1: `deleted_at` is set, the link 404s and disappears from the owner's list, and the row keeps the code reserved, so a printed link or QR code can never be taken over by whoever registers the code next.
 
 **No `click_count`.** Deliberately absent. Adding a counter turns every redirect from one read into a read plus a write, which is the single change most likely to break NFR-01. When analytics arrive they will be a separate append-only table with a cache in front, not a column here.
 
@@ -783,7 +784,8 @@ An external uptime service probes a canary short code and `/healthz`. Alerts fir
 
 | Data | Retention |
 |---|---|
-| Links | Until the owner deletes them |
+| Links | Until the owner deletes them; then kept hidden (soft delete) so the code stays reserved and remains available for abuse review |
+| All of a user's data | Erased on an account-deletion request (§14), including soft-deleted links |
 | Disabled links | Indefinite — the code must stay reserved |
 | Sessions | 30 days, expired rows purged hourly |
 | Creation ledger (`link_creations`) | 24 hours, purged hourly |
@@ -984,5 +986,5 @@ Stated explicitly so they are not rediscovered later as surprises.
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-07-30 | Initial document. Scoped M0—M2, framed as a learning project with learning-verification gates. |
-| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
+| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, owner deletion becomes a soft delete (`links.deleted_at`; codes stay reserved), schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
 | 2.0 | 2026-07-31 | Reframed as a product release. Learning framing and verification gates removed. Added: system architecture with the repository model, platform contract, and resource budget (§7), delivery pipeline (§11), operations with SLOs, backup, and runbook (§12), abuse and acceptable use (§13), privacy under UU PDP (§14), M3 GA gate with pre-launch checklist (§15), expanded security requirements (§10), takedown story and disable fields in the schema. Availability target set at 99.5% with rationale. |

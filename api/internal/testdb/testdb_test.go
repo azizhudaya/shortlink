@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	migratepgx "github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -50,12 +51,13 @@ func TestMigrationsApplyOverM1Data(t *testing.T) {
 
 	var disabledBy *string
 	var userID *int64
+	var deletedAt *time.Time
 	if err := pool.QueryRow(ctx,
-		`SELECT disabled_by, user_id FROM links WHERE short_code = 'm1code'`).Scan(&disabledBy, &userID); err != nil {
+		`SELECT disabled_by, user_id, deleted_at FROM links WHERE short_code = 'm1code'`).Scan(&disabledBy, &userID, &deletedAt); err != nil {
 		t.Fatalf("M1 row did not survive: %v", err)
 	}
-	if disabledBy != nil || userID != nil {
-		t.Fatalf("disabled_by = %v, user_id = %v; want both NULL", disabledBy, userID)
+	if disabledBy != nil || userID != nil || deletedAt != nil {
+		t.Fatalf("disabled_by = %v, user_id = %v, deleted_at = %v; want all NULL", disabledBy, userID, deletedAt)
 	}
 
 	_, err = pool.Exec(ctx, `UPDATE links SET user_id = 999 WHERE short_code = 'm1code'`)

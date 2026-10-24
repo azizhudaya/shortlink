@@ -33,7 +33,7 @@ func (p *Postgres) RescanCandidates(ctx context.Context, since time.Time, afterC
 		SELECT l.short_code, l.long_url, l.user_id,
 		       COALESCE(u.created_at, 'epoch'), COALESCE(u.is_active, false), COALESCE(u.is_whitelisted, false)
 		FROM links l LEFT JOIN users u ON u.id = l.user_id
-		WHERE l.disabled_at IS NULL AND l.created_at >= $1 AND l.short_code > $2
+		WHERE l.disabled_at IS NULL AND l.deleted_at IS NULL AND l.created_at >= $1 AND l.short_code > $2
 		ORDER BY l.short_code
 		LIMIT $3`, since, afterCode, limit)
 	if err != nil {

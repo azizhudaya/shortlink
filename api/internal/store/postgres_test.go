@@ -232,8 +232,8 @@ func TestM1NullDisabledByIsTakenDown(t *testing.T) {
 	}
 }
 
-func TestDeleteFreesCode(t *testing.T) {
-	st, _ := newTestStore(t)
+func TestDeleteIsSoftAndReservesCode(t *testing.T) {
+	st, pool := newTestStore(t)
 	a := mustUser(t, st, "sub-a", "a@example.com")
 	b := mustUser(t, st, "sub-b", "b@example.com")
 	_, _ = st.CreateWithAlias(ctx, a, "mine", "https://example.com")
@@ -241,11 +241,45 @@ func TestDeleteFreesCode(t *testing.T) {
 	if err := st.DeleteByOwner(ctx, a, "mine"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetByCode(ctx, "mine"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("after delete: err = %v, want ErrNotFound", err)
+	if n := count(t, pool, `SELECT count(*) FROM links WHERE short_code = 'mine' AND deleted_at IS NOT NULL`); n != 1 {
+		t.Fatal("row removed or deleted_at not set; want a soft delete")
 	}
-	if _, err := st.CreateWithAlias(ctx, b, "mine", "https://example.com/b"); err != nil {
-		t.Fatalf("alias not reusable after delete: %v", err)
+	if _, err := st.GetByCode(ctx, "mine"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("redirect lookup after delete: err = %v, want ErrNotFound", err)
+	}
+	if links, _, _ := st.ListByOwner(ctx, a, "", 50); len(links) != 0 {
+		t.Fatalf("deleted link still listed: %+v", links)
+	}
+	if err := st.SetDisabledByOwner(ctx, a, "mine", true); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("disable after delete: err = %v, want ErrNotFound", err)
+	}
+	if err := st.DeleteByOwner(ctx, a, "mine"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete: err = %v, want ErrNotFound", err)
+	}
+	// The code stays reserved, so printed links and QR codes can't be taken over.
+	for _, owner := range []int64{a, b} {
+		if _, err := st.CreateWithAlias(ctx, owner, "mine", "https://example.com/other"); !errors.Is(err, ErrAliasTaken) {
+			t.Fatalf("re-create by user %d: err = %v, want ErrAliasTaken", owner, err)
+		}
+	}
+	if c, _ := st.RescanCandidates(ctx, time.Now().Add(-time.Hour), "", 10); len(c) != 0 {
+		t.Fatalf("deleted link is a re-scan candidate: %+v", c)
+	}
+}
+
+func TestBanSkipsDeletedLinks(t *testing.T) {
+	st, pool := newTestStore(t)
+	id := mustUser(t, st, "sub-a", "a@example.com")
+	_, _ = st.CreateWithAlias(ctx, id, "live", "https://example.com/1")
+	_, _ = st.CreateWithAlias(ctx, id, "gone", "https://example.com/2")
+	_ = st.DeleteByOwner(ctx, id, "gone")
+
+	_, links, _, err := st.BanUser(ctx, "a@example.com", "aziz", "spam")
+	if err != nil || links != 1 {
+		t.Fatalf("BanUser took down %d links, err %v; want 1 (the live one)", links, err)
+	}
+	if n := count(t, pool, `SELECT count(*) FROM links WHERE short_code = 'gone' AND disabled_at IS NULL`); n != 1 {
+		t.Fatal("ban touched a deleted link")
 	}
 }
 
