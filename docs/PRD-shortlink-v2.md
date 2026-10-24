@@ -6,9 +6,9 @@
 | **Status** | Approved for build |
 | **Author / Owner** | Aziz Fikri Hudaya |
 | **Type** | Technical PRD (product release) |
-| **Version** | 2.0 |
-| **Supersedes** | v1.0 (2026-07-30) |
-| **Date** | 2026-07-31 |
+| **Version** | 2.1 |
+| **Supersedes** | v2.0 (2026-07-31) |
+| **Date** | 2026-10-24 |
 | **Scope** | Public release (GA) — creation, redirect, accounts, operations |
 
 ---
@@ -80,7 +80,7 @@ The domain is registered and incurring renewal cost while idle. The hosting subs
 ### 2.3 Non-goals
 
 - Competing with commercial shorteners on features or scale.
-- Serving as a shortening service for the general public. Registration is closed (§13.2).
+- Unmoderated anonymous shortening. Anyone with a verified Google account may sign up, but creation always requires an account and runs behind the abuse controls in §13.2.
 - Click analytics, campaign attribution, or UTM management in this release (§4.2).
 - Multi-tenant billing, teams, or shared link ownership.
 - High availability. The service is a single instance on a single host by design (§17).
@@ -124,10 +124,11 @@ The person running the service. Deploys releases, responds to abuse reports, res
 - Single-page creation UI with copy-to-clipboard
 
 **Milestone 2 — Accounts and ownership**
-- Email + password registration behind an invite code
-- Session-based login and logout
+- Sign in with Google (OIDC) as the only way to register and sign in; open registration with a kill switch
+- Server-side sessions, logout, and CSRF protection
 - Link creation requires authentication; links are stamped with an owner
 - Per-user link listing, disable, and delete
+- Abuse controls replacing closed registration: Safe Browsing check on create, hourly Safe Browsing re-scan with auto-takedown, new-account daily quota, sign-up kill switch, one-command account ban and unban, whitelist for trusted users
 
 **Milestone 3 — Production readiness (GA gate)**
 - Automated deploy pipeline with tagged images and one-command rollback
@@ -145,8 +146,8 @@ The person running the service. Deploys releases, responds to abuse reports, res
 | QR code generation | Any external generator handles this. No reason to own it. |
 | Bulk import/export | Not needed at expected link volume. |
 | Password-protected or one-time links | Meaningful additional threat surface for a use case that has not come up. |
-| Open public registration | Directly conflicts with the abuse posture in §13. |
-| OAuth / social login | Adds a third-party dependency and a failure mode; email + password is sufficient for a closed user set. |
+| Email + password accounts | Users won't create another password; Google sign-in is the only identity method (v2.1). |
+| Identity providers other than Google | One provider keeps the attack surface and the failure modes small. |
 | Custom domains per user | Single-tenant product. |
 
 ### 4.3 Future considerations
@@ -220,19 +221,20 @@ So that the link is memorable when spoken, typed, or printed.
 
 ---
 
-#### Story 4 — Register with an invite
+#### Story 4 — Sign up with Google
 
 ```
-As an invited person,
-I want to create an account,
+As a person with a Google account,
+I want to create an account without a new password,
 So that I can own links on this service.
 ```
 
 **Acceptance criteria**
-- [ ] Given a valid unused invite code, when registering with an email and a password of at least 12 characters, then the account is created and the invite is marked consumed
-- [ ] Given an invalid, consumed, or expired invite code, when registering, then registration is refused
-- [ ] Given an email already registered, when registering, then the response does not reveal whether the address exists
-- [ ] Given a successful registration, when the record is written, then the password is stored as an argon2id hash and the plaintext appears in no log or error message
+- [ ] Given a Google account with a verified email and no existing account, when Google sign-in completes and sign-ups are open, then an account bound to that Google `sub` is created and a session starts
+- [ ] Given sign-ups are closed (`SIGNUPS_OPEN=false`), when a Google account with no existing account signs in, then no account is created and the user sees a sign-ups-closed message. Existing accounts still sign in.
+- [ ] Given a Google account whose email is not verified by Google, when sign-in completes, then it is refused
+- [ ] Given a destination flagged by Safe Browsing, when creation is attempted, then it is rejected (400 `UNSAFE_URL`). If Safe Browsing can't be reached, creation fails (503) rather than skipping the check.
+- [ ] Given an account younger than 7 days that has created 10 links in the last 24 h, when an 11th is attempted, then 429 `QUOTA_EXCEEDED` is returned
 
 **Priority:** P0 Â· **Effort:** M
 
@@ -247,9 +249,9 @@ So that only I can manage my links.
 ```
 
 **Acceptance criteria**
-- [ ] Given correct credentials, when submitted, then a session cookie is set with `HttpOnly`, `Secure`, `SameSite=Lax`
-- [ ] Given incorrect credentials, when submitted, then 401 is returned with a message that does not distinguish wrong email from wrong password
-- [ ] Given 5 failed attempts for one account within 15 minutes, when a 6th is made, then it is refused regardless of source IP
+- [ ] Given a successful Google sign-in for an existing account, then a session cookie is set with `HttpOnly`, `Secure`, `SameSite=Lax`
+- [ ] Given a callback with a missing or mismatched `state`, a bad `nonce`, or an ID token failing signature/issuer/audience/expiry checks, then no session is created
+- [ ] Given a deactivated account, when Google sign-in completes, then no session is created
 - [ ] Given logout, when invoked, then the session row is deleted server-side and the cookie is cleared
 - [ ] Given a session older than 30 days, when used, then it is rejected and the row is purged
 
@@ -338,16 +340,23 @@ So that an abusive destination stops resolving before it damages the domain's re
 | FR-05 | Return 409 on alias collision without substituting a code | P0 |
 | FR-06 | Retry generated-code collisions up to 5 times, then fail | P0 |
 | FR-07 | `GET /{code}` returns 302 on hit, 404 on miss, 410 on disabled | P0 |
-| FR-08 | Registration requires a valid single-use invite code | P0 |
-| FR-09 | Passwords hashed with argon2id; never logged | P0 |
+| FR-08 | *Void in v2.1* (was: invite-only registration). Registration is open via Google sign-in. | — |
+| FR-09 | *Void in v2.1* (was: argon2id passwords). No passwords exist. | — |
 | FR-10 | Sessions stored server-side as a hash of the token; revocable | P0 |
 | FR-11 | Creation and all management endpoints require authentication | P0 |
 | FR-12 | Ownership-scoped operations return 404 for non-owned resources | P0 |
 | FR-13 | Owner can list, disable, and delete their own links | P0 |
 | FR-14 | Operator can disable any link and the action is auditable | P0 |
 | FR-15 | Redirects are public and never require authentication | P0 |
-| FR-16 | Per-user and per-IP rate limiting on create and login | P1 |
+| FR-16 | Per-user and per-IP rate limiting on create and sign-in | P1 |
 | FR-17 | Health endpoint reporting process and database reachability | P0 |
+| FR-18 | Every destination checked against Google Safe Browsing at creation; unreachable check fails closed | P0 |
+| FR-19 | Daily creation quota: 10 / 24 h for accounts younger than 7 days, then 100 / 24 h; deletes don't refund it | P0 |
+| FR-20 | Sign-up kill switch (`SIGNUPS_OPEN=false`) refuses new accounts, keeps existing ones working | P0 |
+| FR-21 | Operator account ban: deactivate, end sessions, take down every link, in one command | P0 |
+| FR-22 | Hourly Safe Browsing re-scan of the last 30 days of active links, with auto-takedown and auto-ban of new or repeat-offender owners | P0 |
+| FR-23 | Operator can lift a ban; links taken down by it stay down until reviewed | P1 |
+| FR-24 | Whitelisted users have no daily quota; all other controls still apply | P1 |
 
 ### 5.5 Non-functional requirements
 
@@ -521,22 +530,15 @@ Every application container declares a memory limit. Without limits, one leaking
 
 ```sql
 create table users (
-    id            bigserial   primary key,
-    email         text        not null,
-    password_hash text        not null,
-    is_active     boolean     not null default true,
-    created_at    timestamptz not null default now()
+    id             bigserial   primary key,
+    google_sub     text        not null unique,   -- identity; email is a display copy
+    email          text        not null,
+    is_active      boolean     not null default true,
+    is_whitelisted boolean     not null default false,
+    created_at     timestamptz not null default now(),
+    last_login_at  timestamptz
 );
-create unique index users_email_lower_key on users (lower(email));
-
-create table invites (
-    code        text        primary key,
-    created_by  bigint      references users(id) on delete set null,
-    consumed_by bigint      references users(id) on delete set null,
-    consumed_at timestamptz,
-    expires_at  timestamptz not null,
-    created_at  timestamptz not null default now()
-);
+create index users_created_at_idx on users (created_at);
 
 create table sessions (
     token_hash bytea       primary key,
@@ -559,8 +561,16 @@ create table links (
     disable_reason text,
     created_at    timestamptz not null default now()
 );
-create index links_user_id_created_at_idx on links (user_id, created_at desc);
+create index links_user_id_created_at_idx on links (user_id, created_at desc, short_code desc);
+
+create table link_creations (                  -- quota ledger; survives link deletes
+    user_id    bigint      not null references users(id) on delete cascade,
+    created_at timestamptz not null default now()
+);
+create index link_creations_user_time_idx on link_creations (user_id, created_at);
 ```
+
+`disabled_by` records the actor: `user:<id>` (owner disable, reversible by the owner), `operator:<name>` (takedown or ban), `system:safebrowsing` (re-scan). NULL with `disabled_at` set is an M1-era SQL takedown, treated as operator.
 
 ### 8.2 Design notes
 
@@ -574,7 +584,7 @@ create index links_user_id_created_at_idx on links (user_id, created_at desc);
 
 **No `click_count`.** Deliberately absent. Adding a counter turns every redirect from one read into a read plus a write, which is the single change most likely to break NFR-01. When analytics arrive they will be a separate append-only table with a cache in front, not a column here.
 
-**No PII beyond email.** Session rows record IP and user agent for revocation and abuse review, with a 30-day lifetime tied to session expiry. Redirects are not logged with visitor identifiers (§14).
+**No PII beyond email and the Google account ID.** Session rows record IP and user agent for revocation and abuse review, with a 30-day lifetime tied to session expiry. Redirects are not logged with visitor identifiers (§14).
 
 ---
 
@@ -593,18 +603,19 @@ create index links_user_id_created_at_idx on links (user_id, created_at desc);
 
 | Method | Path | Response |
 |---|---|---|
-| `POST` | `/api/auth/register` | 201 Â· 400 invalid Â· 403 bad invite |
-| `POST` | `/api/auth/login` | 200 + session cookie Â· 401 Â· 429 |
-| `POST` | `/api/auth/logout` | 204 |
+| `GET` | `/api/auth/google/start` | 302 to Google + short-lived oauth cookie Â· 429 |
+| `GET` | `/api/auth/google/callback` | 302 `/links` + session cookie Â· 302 `/signin?error=…` Â· 429 |
+| `POST` | `/api/auth/logout` | 204 (session + CSRF) |
+| `GET` | `/api/auth/me` | 200 `{email, csrf_token}` Â· 401 |
 
 **Links** — authenticated
 
 | Method | Path | Response |
 |---|---|---|
-| `POST` | `/api/links` | 201 Â· 400 Â· 409 alias taken Â· 429 |
+| `POST` | `/api/links` | 201 Â· 400 (`UNSAFE_URL` among others) Â· 409 alias taken Â· 429 (`RATE_LIMITED`, `QUOTA_EXCEEDED`) Â· 503 safety check unavailable |
 | `GET` | `/api/links?cursor=&limit=` | 200, owner-scoped, paginated |
-| `PATCH` | `/api/links/{code}` | 204 disable/enable Â· 404 not owned |
-| `DELETE` | `/api/links/{code}` | 204 Â· 404 not owned |
+| `PATCH` | `/api/links/{code}` | 204 disable/enable Â· 404 not owned Â· 409 taken down |
+| `DELETE` | `/api/links/{code}` | 204 Â· 404 not owned Â· 409 taken down |
 
 ### 9.2 Create request and response
 
@@ -693,10 +704,10 @@ Go builds to a static binary in `gcr.io/distroless/static-debian12:nonroot`. All
 
 | Area | Requirement |
 |---|---|
-| Password hashing | argon2id, `m=19MiB, t=2, p=1`. Concurrency is bounded so a login burst cannot exhaust the memory budget. |
+| Identity | OIDC authorization-code flow with Google: PKCE (S256), `state`, `nonce`; ID token signature, issuer, audience and expiry verified; `email_verified` required; identity = `sub`. Scopes `openid email` only; no Google token is stored. |
 | Session cookie | `HttpOnly`, `Secure`, `SameSite=Lax`, 30-day expiry, server-side revocable |
-| CSRF | `SameSite=Lax` plus a token on state-changing requests |
-| Login throttling | Per-account **and** per-IP. Per-IP alone is trivially bypassed against a single known account. |
+| CSRF | `SameSite=Lax` plus a session-derived token (`X-CSRF-Token`) on state-changing requests; login CSRF covered by `state` |
+| Sign-in throttling | Per-IP on the Google start and callback endpoints |
 | SQL | Parameterized queries exclusively |
 | Request size | Capped at 1 MB at the proxy |
 | Response headers | HSTS with `includeSubDomains`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, server header suppressed |
@@ -773,7 +784,8 @@ An external uptime service probes a canary short code and `/healthz`. Alerts fir
 |---|---|
 | Links | Until the owner deletes them |
 | Disabled links | Indefinite — the code must stay reserved |
-| Sessions | 30 days, expired rows purged daily |
+| Sessions | 30 days, expired rows purged hourly |
+| Creation ledger (`link_creations`) | 24 hours, purged hourly |
 | Application logs | Size-capped rotating Docker driver, roughly 7 days |
 | Backups | 14 days local, per policy off-host |
 
@@ -781,7 +793,7 @@ An external uptime service probes a canary short code and `/healthz`. Alerts fir
 
 Documented procedures, each verified once before GA:
 
-1. **Emergency takedown** — via the operator endpoint; and via direct SQL when the application is down: `update links set disabled_at = now(), disable_reason = '...' where short_code = '...'`
+1. **Emergency takedown** — `docker exec shortlink-api shortlink-api takedown -code X -reason "…" -actor <name>`; account-wide with `user disable`; and via direct SQL when the application is down: `update links set disabled_at = now(), disable_reason = '...' where short_code = '...'`
 2. **Rollback** — `cd /srv/shortlink && ./deploy.sh <previous-sha>`
 3. **Restore from backup** — decrypt, load into a scratch database, verify row counts, promote
 4. **Database access** — `ssh -L 5432:postgres:5432 deploy@vps`, never a published port
@@ -803,7 +815,10 @@ This is why abuse controls appear in the requirements rather than the roadmap.
 | Layer | Control |
 |---|---|
 | Creation | Authentication required — never anonymous, at any milestone |
-| Registration | Invite-code only. No open signup. |
+| Registration | Open via Google sign-in (verified email required). Kill switch `SIGNUPS_OPEN=false` closes it in seconds. |
+| Destination reputation | Google Safe Browsing check on every create (fails closed) and hourly re-scan of the last 30 days with auto-takedown |
+| New accounts | 10 links / 24 h for the first 7 days, then 100; deleting links doesn't refund the quota |
+| Accounts | One-command ban (deactivate, end sessions, take down all links); auto-ban by the re-scan for new or repeat-offender accounts; operator can lift a ban; whitelisted users skip the quota only |
 | Destination | `http`/`https` only; `javascript:`, `data:`, `file:` rejected |
 | Destination | Own hostnames rejected (loop prevention) |
 | Destination | Private, loopback, and link-local addresses rejected — also closes an SSRF vector for any future server-side fetching |
@@ -813,7 +828,7 @@ This is why abuse controls appear in the requirements rather than the roadmap.
 
 ### 13.3 Monitoring
 
-Safe Browsing status for `afh.my.id` is checked weekly. A takedown request received through any channel is actioned first and investigated second — the reputational cost of a slow response exceeds the cost of disabling a link that turns out to be legitimate.
+Safe Browsing status for `afh.my.id` is checked weekly, together with a `user list-recent` review of new accounts. Both are **mandatory** since registration opened (v2.1). Re-scan takedowns are logged (`rescan_takedown`) and optionally pushed to a webhook. A takedown request received through any channel is actioned first and investigated second — the reputational cost of a slow response exceeds the cost of disabling a link that turns out to be legitimate.
 
 ---
 
@@ -823,8 +838,9 @@ The service is operated from Indonesia and stores personal data of registered us
 
 | Data | Basis and handling |
 |---|---|
-| Email address | Required for account identity. Not shared, not used for anything beyond authentication. |
-| Password | Never stored in recoverable form; argon2id hash only. |
+| Google account ID (`sub`) | The account identity. Received from Google at sign-in; scopes `openid email` only. |
+| Email address | Display copy of the Google email, refreshed at sign-in. Not shared, not used beyond identifying the account. |
+| Destination URLs | Sent to Google Safe Browsing at creation and during re-scans, to keep phishing and malware off the domain. |
 | Session IP and user agent | Retained 30 days for session revocation and abuse review, deleted with the session. |
 | Visitor identity on redirect | **Not collected.** No cookies are set on the redirect path, no per-visitor logging, no fingerprinting. |
 
@@ -840,7 +856,7 @@ The service is operated from Indonesia and stores personal data of registered us
 |---|---|---|
 | **M0 — Platform** | `afh-infra` deployed: Caddy, Postgres, networks, firewall, SSH hardening | External port scan shows only 22/80/443; TLS issued for both hostnames |
 | **M1 — Redirect core** | Create + redirect, custom aliases, creation UI | Stories 1–3 acceptance criteria pass on the live domain |
-| **M2 — Accounts** | Invites, auth, ownership, link management | Stories 4–8 pass; authorization verified against a second account |
+| **M2 — Accounts** | Google sign-in, ownership, link management, abuse controls | Stories 4–8 (v2.1) pass on the live domain; authorization verified against a second Google account |
 | **M3 — GA** | Pipeline, backups, monitoring, hardening, abuse controls | §16 pre-launch checklist fully cleared |
 
 M0 must complete before any application deploys — the shared Docker networks are created there, and application compose files declare them as external.
@@ -859,9 +875,9 @@ M0 must complete before any application deploys — the shared Docker networks a
 
 **Before the create endpoint accepts traffic**
 - [ ] Authentication enforced on create
-- [ ] Registration closed behind invites
+- [ ] Safe Browsing check (create + hourly re-scan), quota, kill switch, ban/unban, and whitelist verified
 - [ ] Destination validation covering scheme, own-domain, and private addresses
-- [ ] Rate limiting active on create and login
+- [ ] Rate limiting active on create and sign-in
 - [ ] Codes generated from a CSPRNG
 
 **Before GA is declared**
@@ -879,6 +895,8 @@ M0 must complete before any application deploys — the shared Docker networks a
 | Risk | Impact | Likelihood | Mitigation |
 |---|---|---|---|
 | Domain blocklisted after abuse | Critical — whole product unreachable | Low with controls, high without | §13 controls; weekly reputation check; 60-second takedown |
+| Abuse via open sign-up | Critical — leads to the row above | **High** — registration is open, so abuse is detected and limited, not prevented | Safe Browsing on create, hourly re-scan with auto-takedown, new-account quota, kill switch, one-command ban, weekly review. Residual: a brand-new phishing URL stays live until Google lists it, plus ≤~1 h. If it recurs, re-introduce a gate (allowlist or invite). |
+| Google sign-in or Safe Browsing outage | Medium — no new sessions, or no new links | Low | Redirects never depend on either; sessions last 30 days; creation fails closed during a Safe Browsing outage |
 | Secret committed to a public repository | Critical | Medium | Push protection, pre-publication audit, rotation policy |
 | Host failure or VPS loss | High — full outage | Low | Encrypted off-host backups; RTO 4 h; accepted, not eliminated (§17) |
 | Memory exhaustion from a co-tenant | High — Postgres OOM-killed | Medium | Per-container memory limits; build off-host; 2 GB swap |
@@ -905,7 +923,7 @@ Stated explicitly so they are not rediscovered later as surprises.
 
 **No analytics.** Owners cannot tell whether a link was ever followed. Accepted for this release to protect NFR-01; 302 keeps the option open.
 
-**Closed registration.** The service cannot grow a user base without operator action. Accepted, and in fact intended — it is the single most effective abuse control available.
+**Open registration (v2.1).** Anyone with a verified Google account can sign up. This gives up the single most effective abuse control (closed registration) because users won't create yet another password-based account and invites add friction the product doesn't want. Accepted with compensating controls (§13.2) and mandatory weekly review (§13.3); the schema allows re-introducing a gate if abuse recurs.
 
 ---
 
@@ -917,10 +935,12 @@ Stated explicitly so they are not rediscovered later as surprises.
 - [ ] GHCR available for image storage and retrieval
 - [ ] External uptime monitoring service
 - [ ] Off-host backup destination
+- [ ] Google Identity (OAuth client, consent screen in production) for sign-in
+- [ ] Google Safe Browsing Lookup API v4 (free for non-commercial use) for destination checks
 
 **Assumptions**
 - Traffic remains well below NFR-04. Exceeding it invalidates the single-host topology, not just the targets.
-- The user set stays small and known. Open registration would require reopening §13 entirely.
+- The user set may grow through open registration; §13's controls, not the user count, carry the abuse posture.
 - The VPS provider offers a snapshot or rebuild path within the 4-hour RTO.
 - The operator is the sole administrator; no shared or delegated access is modelled.
 
@@ -938,10 +958,8 @@ Stated explicitly so they are not rediscovered later as surprises.
   **Leaning:** Public, but reporting only `ok`/`degraded` with no version or dependency detail.
   **Decide by:** M3
 
-- [ ] **How are invite codes generated and delivered?**
-  **Context:** No email delivery exists in the system, and adding one introduces a provider dependency and a deliverability failure mode.
-  **Leaning:** Operator generates codes via CLI and shares them out of band. No email infrastructure.
-  **Decide by:** M2
+- [x] **How are invite codes generated and delivered?**
+  **Resolved in v2.1:** there are no invites. Registration is open via Google sign-in.
 
 - [ ] **Does the 404 page need to explain itself?**
   **Context:** A bare 404 is cheap and leaks nothing; a branded page reassures a visitor who mistyped a printed code.
@@ -965,4 +983,5 @@ Stated explicitly so they are not rediscovered later as surprises.
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-07-30 | Initial document. Scoped M0—M2, framed as a learning project with learning-verification gates. |
+| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), FR-18–FR-24, schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
 | 2.0 | 2026-07-31 | Reframed as a product release. Learning framing and verification gates removed. Added: system architecture with the repository model, platform contract, and resource budget (§7), delivery pipeline (§11), operations with SLOs, backup, and runbook (§12), abuse and acceptable use (§13), privacy under UU PDP (§14), M3 GA gate with pre-launch checklist (§15), expanded security requirements (§10), takedown story and disable fields in the schema. Availability target set at 99.5% with rationale. |

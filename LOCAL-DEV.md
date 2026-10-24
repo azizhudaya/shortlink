@@ -31,12 +31,34 @@ psql -d postgres -c "CREATE ROLE shortlink_api WITH LOGIN NOSUPERUSER PASSWORD '
 psql -d postgres -c "CREATE DATABASE shortlink OWNER shortlink_api;"
 ```
 
+For the integration tests, a second database (the tests empty it on every run):
+
+```bash
+psql -d postgres -c "CREATE DATABASE shortlink_test OWNER shortlink_api;"
+```
+
 This mirrors what `../afh-infra/postgres/initdb/001_create_shortlink_db.sql`
 does on first boot on the VPS. Local Postgres is 18 while production targets 16
 (PRD §7.4); nothing in this schema is version-dependent, but keep the gap in
 mind if you ever hit behaviour that differs.
 
-### 2. Dependencies
+### 2. Google credentials (M2)
+
+The API refuses to start without `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and
+`SAFE_BROWSING_API_KEY`. Keep the **dev** values outside the repo (it is
+public):
+
+```bash
+mkdir -p ~/.config/shortlink && chmod 700 ~/.config/shortlink
+$EDITOR ~/.config/shortlink/dev.env      # GOOGLE_CLIENT_ID=…, GOOGLE_CLIENT_SECRET=…, SAFE_BROWSING_API_KEY=<dev key>
+chmod 600 ~/.config/shortlink/dev.env
+```
+
+Use the Safe Browsing key without an IP restriction (the production key is
+locked to the VPS). The OAuth client must list
+`http://localhost:3000/api/auth/google/callback` as a redirect URI.
+
+### 3. Dependencies
 
 Both are already resolved in this checkout (`api/go.sum` and
 `web/package-lock.json` are committed). Re-run only if they go missing:
@@ -54,10 +76,19 @@ cd ../web && npm install   # generates package-lock.json
 
 ```bash
 cd api
+set -a; source ~/.config/shortlink/dev.env; set +a
 export DATABASE_URL='postgres://shortlink_api:devpassword@localhost:5432/shortlink?sslmode=disable'
 export PUBLIC_HOSTNAMES='afh.my.id,app.afh.my.id'
+# Sign-in over http://localhost: drop the __Host- prefix and Secure flag, and
+# send Google back through the Next dev proxy.
+export INSECURE_DEV_COOKIES=1
+export GOOGLE_REDIRECT_URL=http://localhost:3000/api/auth/google/callback
 go run ./cmd/shortlink-api
 ```
+
+Sign in at `http://localhost:3000/signin`. Always use `localhost:3000`, not
+`:8080`, in the browser: the session cookie belongs to the origin that set it.
+To test the kill switch, restart the API with `SIGNUPS_OPEN=false`.
 
 Expect:
 
@@ -67,8 +98,8 @@ Expect:
 ```
 
 Migrations run in-process at startup, so there is no separate migrate step.
-`DATABASE_URL` is the only required variable — the process exits immediately
-without it.
+The process exits immediately without `DATABASE_URL` or any of the three
+credentials.
 
 ### Terminal 2 — Web
 
@@ -113,7 +144,10 @@ acceptance criterion.
 
 ## Verifying the M1 acceptance criteria
 
-All of the following were run against the live local stack and pass.
+These were run against the M1 stack. **Since M2, `POST /api/links` needs a
+session and a CSRF token**, so the curl creation examples below return 401 as
+written; create links through the UI (or add `-b sl_session=<cookie>` and
+`-H "X-CSRF-Token: <from /api/auth/me>"`). The redirect checks still apply.
 
 ```bash
 B=http://localhost:8080
@@ -156,7 +190,8 @@ curl -s -X POST $B/api/links -H 'Content-Type: application/json' \
 Tests and build:
 
 ```bash
-cd api  && go test ./... && go vet ./... && gofmt -l .
+export TEST_DATABASE_URL='postgres://shortlink_api:devpassword@localhost:5432/shortlink_test?sslmode=disable'
+cd api  && go test -p 1 ./... && go vet ./... && gofmt -l .
 cd ../web && npx tsc --noEmit && npm run build && npm audit
 ```
 
@@ -166,7 +201,7 @@ cd ../web && npx tsc --noEmit && npm run build && npm audit
 
 ```bash
 # wipe data, keep the database
-psql -d shortlink -c "TRUNCATE links;"
+psql -d shortlink -c "TRUNCATE links, link_creations, sessions, users RESTART IDENTITY CASCADE;"
 
 # or start completely fresh (migrations re-run at next API startup)
 psql -d postgres -c "DROP DATABASE shortlink;"

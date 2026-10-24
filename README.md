@@ -50,21 +50,63 @@ interrupt the redirect path) without paying for it in cross-repo coordination.
 From M3, CI applies path filters on `api/**` and `web/**` so a change to one
 does not rebuild or redeploy the other.
 
-## Endpoints (M1)
+## Endpoints (M2)
 
-| Method | Path | Behaviour |
-|---|---|---|
-| `GET` | `/{code}` | 302 to destination · 404 unknown · 410 disabled (FR-07) |
-| `GET` | `/healthz` | 200 with process + database reachability (FR-17) |
-| `POST` | `/api/links` | 201 created · 400 invalid · 409 alias taken · 415 not JSON |
+Redirects (`GET /{code}`) and `/healthz` are public. Everything under `/api/*`
+other than the Google sign-in start/callback needs a session, and every
+mutating call also needs the `X-CSRF-Token` from `GET /api/auth/me`. The full
+table is in [`api/README.md`](api/README.md).
 
-Creation has no accounts in M1; accounts arrive with M2 (Stories 4–6). Until
-then, `app.afh.my.id` (UI and `/api/*`) sits behind **Caddy basic auth**
-configured in `afh-infra`, and `afh.my.id/api/*` returns 404 so the create
-endpoint cannot be reached around it. `POST /api/links` also requires
-`Content-Type: application/json` (415 otherwise), which stops other sites from
-using the operator's cached credentials. Remove the basic auth when M2 lands.
-See "Known gaps" in `docs/M1-IMPLEMENTATION-PLAN.md`.
+Sign-in is **Google only** and registration is **open**, so the abuse controls
+in `docs/PRD-shortlink-v2.md` §13.2 carry the domain's reputation: Safe Browsing
+on every create (fails closed), an hourly Safe Browsing re-scan with automatic
+takedown, a new-account daily quota, a sign-up kill switch, and one-command
+bans. M1's Caddy basic auth on `app.afh.my.id` stays on until the M2 gate passes
+on the live domain (`docs/M2-IMPLEMENTATION-PLAN.md`, Task 13).
+
+## Operator runbook
+
+All commands run on the VPS in `/srv/shortlink`. `SL` below is
+`docker exec shortlink-api shortlink-api`.
+
+**Abuse wave**
+1. Close sign-ups: set `SIGNUPS_OPEN=false` in `.env`, then `docker compose up -d shortlink-api` (~5 s). Existing accounts keep working.
+2. Find the accounts: `$SL user list-recent -days 2`.
+3. Ban each abuser: `$SL user disable -email x -reason "phishing wave" -actor aziz` (sessions ended, every link taken down).
+4. Sweep now rather than waiting for the hour: `$SL links rescan`.
+5. Check the Safe Browsing status of `afh.my.id` (Transparency Report / Search Console). Remove `SIGNUPS_OPEN` and recreate when clean.
+
+**Single takedown**: `$SL takedown -code X -reason "…" -actor aziz`. If the
+app is down, over the SSH tunnel:
+`UPDATE links SET disabled_at = now(), disabled_by = 'operator:aziz', disable_reason = '…' WHERE short_code = 'X';`
+
+**Lift a ban** (D28)
+1. `$SL user enable -email x -actor aziz`. The user signs in again; their links stay down.
+2. List what the ban took down: `SELECT short_code, long_url, disabled_by, disable_reason, disabled_at FROM links WHERE user_id = <id> AND disabled_at IS NOT NULL ORDER BY disabled_at;`
+3. Check each destination and restore only the safe ones: `UPDATE links SET disabled_at = NULL, disabled_by = NULL, disable_reason = NULL WHERE user_id = <id> AND short_code IN ('…');`
+   **Never restore** a link whose `disable_reason` starts with `safe browsing:`.
+
+**Whitelist** (D29): the user signs in once, then `$SL user whitelist -email x`
+(`-off` to remove). SQL fallback:
+`UPDATE users SET is_whitelisted = <bool> WHERE lower(email) = '<email>';`.
+Takes effect on the next create; no restart.
+
+**Re-scan alerts** (D27): `docker logs shortlink-api 2>&1 | grep rescan_takedown`.
+A "review owner" alert means one link of an established account was taken
+down: look at that user's links and `user disable` them if abusive. Set
+`ALERT_WEBHOOK_URL` in `.env` (e.g. an ntfy.sh topic) to get pushes. Persistent
+`rescan stopped: safe browsing unavailable` warnings mean the key or its quota
+needs attention.
+
+**Claim the M1 links** (D16, once): after the operator's first sign-in,
+`UPDATE links SET user_id = <your id> WHERE user_id IS NULL;`
+
+**Rotate a secret** (Google client secret or Safe Browsing key): create the new
+value in Google Cloud Console, put it in `.env`, `docker compose up -d
+shortlink-api`, then revoke the old one.
+
+**Weekly** (mandatory since registration opened): `$SL user list-recent` and
+the Safe Browsing status of `afh.my.id`.
 
 ## Hostname routing
 
@@ -81,8 +123,10 @@ browser request same-origin, so CORS never enters the system.
 See `LOCAL-DEV.md`. Short version:
 
 ```bash
-cd api && go run ./cmd/shortlink-api      # :8080, migrations run at startup
-cd web && npm run dev                     # :3000, proxies /api/* to :8080
+set -a; source ~/.config/shortlink/dev.env; set +a    # Google + Safe Browsing dev credentials
+cd api && INSECURE_DEV_COOKIES=1 GOOGLE_REDIRECT_URL=http://localhost:3000/api/auth/google/callback \
+  go run ./cmd/shortlink-api                           # :8080, migrations run at startup
+cd web && npm run dev                                  # :3000, proxies /api/* to :8080
 ```
 
 ## Deploy

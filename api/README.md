@@ -13,14 +13,21 @@ Module path: `github.com/azizhudaya/shortlink/api`.
 ## Layout
 
 ```
-cmd/shortlink-api/    entrypoint: config -> migrate -> serve
+cmd/shortlink-api/    entrypoint: serve (config -> migrate -> serve) and operator subcommands
 internal/config/      env-driven configuration
-internal/httpserver/  router, handlers, middleware
+internal/httpserver/  router, handlers, middleware, sessions, CSRF
+internal/auth/        session/CSRF tokens, OAuth flow state, Google OIDC client
+internal/oidctest/    fake OIDC provider for tests
+internal/safety/      Google Safe Browsing Lookup API v4 client (FR-18)
+internal/rescan/      hourly Safe Browsing re-scan with auto-takedown (FR-22)
+internal/alert/       optional webhook alerts for re-scan takedowns
+internal/ratelimit/   keyed token-bucket limiter (FR-16)
+internal/testdb/      migrated, truncated database for integration tests
 internal/shortcode/   CSPRNG base62 code generation (FR-01)
 internal/alias/       custom-alias validation + reserved-prefix list (FR-02, FR-04)
 internal/urlvalidate/ destination validation: scheme, own-domain, private IPs (FR-03)
 internal/store/       Postgres persistence, collision handling (FR-05, FR-06)
-internal/model/       Link struct mirroring the links table
+internal/model/       Link, User, Session
 internal/migrations/  golang-migrate SQL, embedded and run at startup
 Dockerfile            static binary in a distroless nonroot image
 ```
@@ -29,24 +36,45 @@ The binary and container are both named `shortlink-api` — that name is
 registered in `afh-infra/docs/NETWORKS.md` (PLT-02) and Caddy routes to it, so
 it is not free to change.
 
-## Endpoints (M1)
+## Endpoints (M2)
 
-| Method | Path | Behaviour |
-|---|---|---|
-| `GET` | `/{code}` | 302 to destination · 404 unknown · 410 disabled (FR-07) |
-| `GET` | `/healthz` | 200 with process + database reachability (FR-17) |
-| `POST` | `/api/links` | 201 created · 400 invalid · 409 alias taken · 415 not JSON |
+| Method | Path | Auth | Behaviour |
+|---|---|---|---|
+| `GET` | `/{code}` | — | 302 · 404 unknown · 410 disabled (FR-07). No cookie, no session lookup. |
+| `GET` | `/healthz` | — | 200 with process + database reachability (FR-17) |
+| `GET` | `/api/auth/google/start` | — | 302 to Google + oauth cookie |
+| `GET` | `/api/auth/google/callback` | oauth cookie | 302 `/links` + session cookie, or `/signin?error=…` |
+| `POST` | `/api/auth/logout` | session + CSRF | 204 |
+| `GET` | `/api/auth/me` | session | `{email, csrf_token}` |
+| `POST` | `/api/links` | session + CSRF | 201 · 400 · 409 · 429 · 503 |
+| `GET` | `/api/links?cursor=&limit=` | session | own links, newest first |
+| `PATCH` | `/api/links/{code}` | session + CSRF | `{"disabled": bool}` → 204 · 404 · 409 |
+| `DELETE` | `/api/links/{code}` | session + CSRF | 204 · 404 · 409 |
 
-The API itself does not authenticate creation in M1 — that arrives with M2
-(Stories 4–6). Until then Caddy basic auth on `app.afh.my.id` restricts it
-(see the repo README and "Known gaps" in
-[`../docs/M1-IMPLEMENTATION-PLAN.md`](../docs/M1-IMPLEMENTATION-PLAN.md)).
+Full decisions (D3–D29) are in
+[`../docs/M2-IMPLEMENTATION-PLAN.md`](../docs/M2-IMPLEMENTATION-PLAN.md).
+
+## Operator subcommands
+
+Run on the VPS with `docker exec shortlink-api shortlink-api …`. They need only
+`DATABASE_URL`, never migrate, and refuse a schema older than version 2.
+
+```
+shortlink-api takedown -code CODE -reason TEXT -actor NAME
+shortlink-api user disable -email EMAIL -reason TEXT -actor NAME   # ban: sessions ended, all links taken down
+shortlink-api user enable -email EMAIL -actor NAME                 # lift a ban; links stay down
+shortlink-api user whitelist -email EMAIL [-off]                   # no daily quota
+shortlink-api user list-recent [-days 7]
+shortlink-api links rescan                                         # one Safe Browsing re-scan pass now
+```
 
 ## Local development
 
 ```bash
+set -a; source ~/.config/shortlink/dev.env; set +a   # GOOGLE_* + SAFE_BROWSING_API_KEY
 export DATABASE_URL='postgres://shortlink_api:...@localhost:5432/shortlink?sslmode=disable'
 export PUBLIC_HOSTNAMES='afh.my.id,app.afh.my.id'
+export INSECURE_DEV_COOKIES=1 GOOGLE_REDIRECT_URL=http://localhost:3000/api/auth/google/callback
 go run ./cmd/shortlink-api
 ```
 
@@ -57,8 +85,12 @@ step to forget. Full setup, including the database, is in
 ## Checks
 
 ```bash
-go test ./... && go vet ./... && gofmt -l .
+export TEST_DATABASE_URL='postgres://shortlink_api:devpassword@localhost:5432/shortlink_test?sslmode=disable'
+go test -p 1 ./... && go vet ./... && gofmt -l .
 ```
+
+Integration tests share one database, hence `-p 1`. Without
+`TEST_DATABASE_URL` they skip and the rest still run.
 
 ## Deploy
 
