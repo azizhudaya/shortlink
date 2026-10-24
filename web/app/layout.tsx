@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import './globals.css';
+import Nav from './components/Nav';
+import { SessionProvider } from '@/lib/session';
 
 // Same typeface as the personal site. next/font downloads it at build time
 // and serves it from this app, so the browser never calls Google Fonts.
@@ -21,7 +23,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={geistSans.variable}>
       <body>
-        <main>{children}</main>
+        <SessionProvider>
+          <Nav />
+          <main>{children}</main>
+        </SessionProvider>
       </body>
     </html>
   );

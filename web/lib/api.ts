@@ -10,6 +10,8 @@ export type CreateResponse = {
   created_at: string;
 };
 
+export type Me = { email: string; csrf_token: string };
+
 // Mirrors the API's error shape. Branch on `code`, never on `message` text.
 type ErrorResponse = {
   error: { code: string; message: string };
@@ -20,42 +22,78 @@ export type CreateLinkInput = {
   customAlias?: string;
 };
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; message: string };
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; message: string };
 
-export async function createLink({ url, customAlias }: CreateLinkInput): Promise<ApiResult<CreateResponse>> {
+// The API derives the CSRF token from the session (GET /api/auth/me); every
+// mutating request must echo it. Held in memory only, never in storage.
+let csrfToken: string | null = null;
+
+export function setCsrfToken(t: string | null) {
+  csrfToken = t;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
+  const headers = new Headers(init.headers);
+  const method = (init.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' && csrfToken) headers.set('X-CSRF-Token', csrfToken);
+  if (init.body !== undefined) headers.set('Content-Type', 'application/json');
+
   let res: Response;
   try {
     // Same-origin: Caddy proxies /api/* to the API, so no base URL or CORS.
-    res = await fetch('/api/links', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url,
-        custom_alias: customAlias || undefined,
-      }),
-    });
+    res = await fetch(path, { ...init, method, headers, credentials: 'same-origin' });
   } catch {
-    return { ok: false, message: 'Could not reach the server. Check your connection and try again.' };
+    return { ok: false, status: 0, message: 'Could not reach the server. Check your connection and try again.' };
   }
 
   if (!res.ok) {
     // A proxy-level failure (e.g. a 502 from Caddy) has no JSON body.
     const body = (await res.json().catch(() => null)) as ErrorResponse | null;
-    return { ok: false, message: messageFor(body?.error?.code, body?.error?.message) };
+    return {
+      ok: false,
+      status: res.status,
+      message: messageFor(body?.error?.code, body?.error?.message, res.headers.get('Retry-After')),
+    };
   }
-
-  return { ok: true, data: (await res.json()) as CreateResponse };
+  if (res.status === 204) return { ok: true, data: null as T };
+  return { ok: true, data: (await res.json()) as T };
 }
 
-// The API's messages are already user-facing, but a couple of cases read
-// better with frontend-specific wording.
-function messageFor(code: string | undefined, message: string | undefined): string {
+export function me(): Promise<ApiResult<Me>> {
+  return request<Me>('/api/auth/me');
+}
+
+export async function logout(): Promise<void> {
+  await request<null>('/api/auth/logout', { method: 'POST' });
+}
+
+export function createLink({ url, customAlias }: CreateLinkInput): Promise<ApiResult<CreateResponse>> {
+  return request<CreateResponse>('/api/links', {
+    method: 'POST',
+    body: JSON.stringify({ url, custom_alias: customAlias || undefined }),
+  });
+}
+
+// The API's messages are already user-facing, but some cases read better
+// with frontend-specific wording.
+function messageFor(code: string | undefined, message: string | undefined, retryAfter: string | null): string {
   switch (code) {
     case 'ALIAS_TAKEN':
       return 'That alias is already taken. Try another.';
     case 'BAD_REQUEST':
       return 'Something was wrong with that request. Check the URL and try again.';
+    case 'RATE_LIMITED': {
+      const minutes = Math.max(1, Math.ceil(Number(retryAfter ?? 60) / 60));
+      return `Too many requests. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+    }
+    case 'QUOTA_EXCEEDED':
+      return "You've reached today's link limit. New accounts can create 10 links a day for their first week.";
+    case 'UNAUTHORIZED':
+      return 'Your session has ended. Sign in again.';
+    case 'CSRF_INVALID':
+      return 'Your session token is out of date. Reload the page and try again.';
     default:
-      return message ?? 'Could not create the link.';
+      // UNSAFE_URL, SAFETY_CHECK_UNAVAILABLE and the rest carry API copy.
+      return message ?? 'Something went wrong. Try again.';
   }
 }

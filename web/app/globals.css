@@ -166,6 +166,78 @@ button.outline {
   padding: 0.5rem 1.125rem;
 }
 
+/* An <a> that looks like the primary button (sign-in is a navigation). */
+a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2.25rem;
+  background: var(--fill);
+  color: var(--on-fill);
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 0.875rem 1.375rem;
+  transition: transform 0.2s var(--ease-apple);
+}
+
+a.button:hover {
+  color: var(--on-fill);
+}
+
+a.button:active {
+  transform: scale(0.98);
+}
+
+.nav {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 0;
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+}
+
+.nav a {
+  text-decoration: none;
+  color: var(--mute);
+}
+
+.nav a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* A button styled as a nav link. */
+button.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-left: auto;
+  color: var(--mute);
+  font-weight: 400;
+}
+
+button.link-button:hover {
+  color: var(--accent);
+}
+
+.prose h2 {
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+  margin: 2rem 0 0.5rem;
+}
+
+.prose p {
+  margin: 0 0 1rem;
+}
+
+.prose a {
+  color: var(--accent);
+}
+
 .error {
   color: var(--error);
   margin-top: 1.5rem;

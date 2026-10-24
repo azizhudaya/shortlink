@@ -2,8 +2,17 @@
 
 import { useState } from 'react';
 import { createLink, type CreateResponse } from '@/lib/api';
+import RequireAuth from './components/RequireAuth';
 
 export default function Page() {
+  return (
+    <RequireAuth>
+      <CreateForm />
+    </RequireAuth>
+  );
+}
+
+function CreateForm() {
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
   const [result, setResult] = useState<CreateResponse | null>(null);
