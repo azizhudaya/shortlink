@@ -51,7 +51,7 @@ export default function SignInPage() {
       </Suspense>
 
       <p className="hint">
-        AFH Shortlink stores only your Google email and account ID. We never see your Google password.{' '}
+        We only use your Google account to sign you in, and never see your password.{' '}
         <Link href="/privacy">Privacy</Link>
       </p>
     </div>
