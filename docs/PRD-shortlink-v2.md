@@ -130,6 +130,7 @@ The person running the service. Deploys releases, responds to abuse reports, res
 - Per-user link listing, disable, and delete
 - QR code for each short link, downloadable as PNG and SVG
 - Click counts per link per day, recorded in the database (no UI yet)
+- Light/dark theme: follows the device by default, with a sun/moon toggle remembered per browser
 - Abuse controls replacing closed registration: Safe Browsing check on create, hourly Safe Browsing re-scan with auto-takedown, new-account daily quota, sign-up kill switch, one-command account ban and unban, whitelist for trusted users
 
 **Milestone 3 — Production readiness (GA gate)**
@@ -358,6 +359,7 @@ So that an abusive destination stops resolving before it damages the domain's re
 | FR-22 | Hourly Safe Browsing re-scan of the last 30 days of active links, with auto-takedown and auto-ban of new or repeat-offender owners | P0 |
 | FR-23 | Operator can lift a ban; links taken down by it stay down until reviewed | P1 |
 | FR-24 | Whitelisted users have no daily quota; all other controls still apply | P1 |
+| FR-27 | Light and dark theme on every page. Default follows the device setting; a sun/moon icon toggle switches it and the choice is remembered in that browser (switching back to the device's theme forgets it). No flash of the wrong theme on load. QR codes stay black on white. | P2 |
 | FR-26 | Redirects served are counted per link per UTC day in `link_clicks_daily`: counts only, no visitor identifiers; the redirect path does no extra I/O (in-memory counter, flushed in batches each minute). Viewed by SQL for now; no UI. | P1 |
 | FR-25 | Owner can show a QR code for any of their links that isn't taken down, and download it as PNG and SVG; it encodes only the short URL and is generated in the browser | P1 |
 
@@ -995,5 +997,5 @@ Stated explicitly so they are not rediscovered later as surprises.
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-07-30 | Initial document. Scoped M0—M2, framed as a learning project with learning-verification gates. |
-| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, daily click counts recorded in the database (FR-26), owner deletion becomes a soft delete (`links.deleted_at`; codes stay reserved), schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
+| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, daily click counts recorded in the database (FR-26), light/dark theme toggle (FR-27), owner deletion becomes a soft delete (`links.deleted_at`; codes stay reserved), schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
 | 2.0 | 2026-07-31 | Reframed as a product release. Learning framing and verification gates removed. Added: system architecture with the repository model, platform contract, and resource budget (§7), delivery pipeline (§11), operations with SLOs, backup, and runbook (§12), abuse and acceptable use (§13), privacy under UU PDP (§14), M3 GA gate with pre-launch checklist (§15), expanded security requirements (§10), takedown story and disable fields in the schema. Availability target set at 99.5% with rationale. |

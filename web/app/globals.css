@@ -20,8 +20,11 @@
   color-scheme: light;
 }
 
+/* Theme (D33): follow the device by default; a stored choice sets
+   data-theme on <html>. Dark tokens apply when the device prefers dark and
+   the user didn't pick light, or when the user picked dark. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --canvas: #000000;
     --ink: #f5f5f7;
     --mute: #86868b;
@@ -33,6 +36,19 @@
     --error: #ff9c8f;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #000000;
+  --ink: #f5f5f7;
+  --mute: #86868b;
+  --line: #333336;
+  --accent: #16b981;
+  /* zinc-400: zinc-600 on black is too faint */
+  --highlight: #a1a1aa;
+  --tile: #161617;
+  --error: #ff9c8f;
+  color-scheme: dark;
 }
 
 * {
@@ -189,10 +205,61 @@ a.button:active {
   transform: scale(0.98);
 }
 
-.nav {
+/* Nav (signed in only) on the left, theme toggle always on the right. */
+.topbar {
   max-width: 36rem;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+button.theme-toggle {
+  margin-left: auto;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--mute);
+}
+
+button.theme-toggle:hover {
+  color: var(--ink);
+  border-color: var(--mute);
+}
+
+/* The icon shows the theme in use: sun in light, moon in dark. Same rules
+   as the dark tokens above, so it is right before any JavaScript runs. */
+.theme-toggle .icon-moon {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-sun {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-moon {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .icon-sun {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) .theme-toggle .icon-moon {
+    display: block;
+  }
+}
+
+.nav {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 1.25rem;
   align-items: center;

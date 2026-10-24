@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import './globals.css';
 import Nav from './components/Nav';
+import ThemeToggle, { themeScript } from './components/ThemeToggle';
 import { SessionProvider } from '@/lib/session';
 
 // Same typeface as the personal site. next/font downloads it at build time
@@ -21,10 +22,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={geistSans.variable}>
+    // suppressHydrationWarning: themeScript may set data-theme on <html>
+    // before React hydrates, which is intended (D33).
+    <html lang="en" className={geistSans.variable} suppressHydrationWarning>
+      <head>
+        {/* Runs before first paint so a stored theme never flashes the other one. */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>
         <SessionProvider>
-          <Nav />
+          <header className="topbar">
+            <Nav />
+            <ThemeToggle />
+          </header>
           <main>{children}</main>
         </SessionProvider>
       </body>
