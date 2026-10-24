@@ -210,6 +210,15 @@ a.button:active {
   transform: scale(0.98);
 }
 
+/* The AFH mark above the sign-in heading. Transparent PNG, so it sits on
+   either theme's canvas. */
+.brand-logo {
+  display: block;
+  height: 3rem;
+  width: auto;
+  margin-bottom: 1.5rem;
+}
+
 /* Breathing room between the sign-in button and the line below it. */
 a.signin-cta {
   margin-bottom: 1.25rem;

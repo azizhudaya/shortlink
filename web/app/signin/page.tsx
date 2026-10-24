@@ -33,8 +33,10 @@ export default function SignInPage() {
 
   return (
     <div className="wrap">
+      {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo, no optimisation needed */}
+      <img className="brand-logo" src="/afh-logo.png" width={59} height={48} alt="AFH" />
       <h1>
-        Shortlink. <span className="highlight">Sign in to create short links.</span>
+        AFH Shortlink. <span className="highlight">Sign in to create short links.</span>
       </h1>
 
       {/* A plain link, not a fetch: sign-in is a full navigation to Google
@@ -49,7 +51,7 @@ export default function SignInPage() {
       </Suspense>
 
       <p className="hint">
-        Shortlink stores only your Google email and account ID. We never see your Google password.{' '}
+        AFH Shortlink stores only your Google email and account ID. We never see your Google password.{' '}
         <Link href="/privacy">Privacy</Link>
       </p>
     </div>
