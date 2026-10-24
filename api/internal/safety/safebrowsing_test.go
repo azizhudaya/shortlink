@@ -97,3 +97,39 @@ func TestCheckRequestShape(t *testing.T) {
 		t.Errorf("client = %+v", body.Client)
 	}
 }
+
+func TestCheckBatchMapsMatches(t *testing.T) {
+	var gotEntries int
+	sb := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		var body findRequest
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotEntries = len(body.ThreatInfo.ThreatEntries)
+		io.WriteString(w, `{"matches":[{"threatType":"MALWARE","threat":{"url":"https://b.example/"}}]}`)
+	})
+	flagged, err := sb.CheckBatch(context.Background(), []string{"https://a.example/", "https://b.example/", "https://c.example/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotEntries != 3 || len(flagged) != 1 || flagged["https://b.example/"] != "MALWARE" {
+		t.Fatalf("entries sent %d, flagged %v", gotEntries, flagged)
+	}
+}
+
+func TestCheckBatchRejectsOver500(t *testing.T) {
+	sb := serve(t, func(w http.ResponseWriter, _ *http.Request) { t.Error("request sent"); io.WriteString(w, "{}") })
+	urls := make([]string, 501)
+	for i := range urls {
+		urls[i] = "https://example.com/" + strings.Repeat("x", i%7)
+	}
+	if _, err := sb.CheckBatch(context.Background(), urls); err == nil {
+		t.Fatal("501 URLs accepted")
+	}
+}
+
+func TestCheckBatchErrorIsUnavailable(t *testing.T) {
+	sb := serve(t, func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "boom", http.StatusInternalServerError) })
+	_, err := sb.CheckBatch(context.Background(), []string{"https://a.example/"})
+	if !errors.Is(err, ErrUnavailable) || strings.Contains(err.Error(), testKey) {
+		t.Fatalf("err = %v", err)
+	}
+}

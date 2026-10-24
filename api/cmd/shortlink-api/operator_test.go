@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"regexp"
 	"strings"
@@ -170,3 +173,37 @@ func TestUserListRecent(t *testing.T) {
 		t.Fatalf("list-recent output:\n%s", out)
 	}
 }
+
+func TestLinksRescanPrintsReport(t *testing.T) {
+	st := newOperatorEnv(t)
+	u, _, _ := st.UpsertGoogleUser(ctx, "sub-a", "a@example.com", true)
+	_, _ = st.CreateWithAlias(ctx, u.ID, "bad", "https://bad.example/")
+	_, _ = st.CreateWithAlias(ctx, u.ID, "fine", "https://fine.example/")
+
+	sb := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `{"matches":[{"threatType":"SOCIAL_ENGINEERING","threat":{"url":"https://bad.example/"}}]}`)
+	}))
+	defer sb.Close()
+	prev := safeBrowsingEndpoint
+	safeBrowsingEndpoint = sb.URL
+	t.Cleanup(func() { safeBrowsingEndpoint = prev })
+	t.Setenv("SAFE_BROWSING_API_KEY", "test-key")
+
+	out, err := run(t, links, "rescan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 2 || lines[0] != "scanned=2 taken_down=1 banned=1" ||
+		!strings.Contains(lines[1], "bad") || !strings.Contains(lines[1], "ban") {
+		t.Fatalf("output:\n%s", out)
+	}
+	if l, _ := st.GetByCode(ctx, "fine"); l.Status() != "taken_down" {
+		t.Fatal("new account's other link survived the ban")
+	}
+	if _, err := run(t, links, "frobnicate"); !errors.Is(err, errUsage) {
+		t.Fatalf("unknown subcommand: err = %v", err)
+	}
+}
+
+func links(args []string, out *bytes.Buffer) error { return runLinks(args, out) }

@@ -39,6 +39,8 @@ func main() {
 		err = runTakedown(os.Args[2:], os.Stdout)
 	case "user":
 		err = runUser(os.Args[2:], os.Stdout)
+	case "links":
+		err = runLinks(os.Args[2:], os.Stdout)
 	default:
 		err = fmt.Errorf("%w: unknown command %q", errUsage, cmd)
 	}
@@ -96,6 +98,9 @@ func serve(logger *slog.Logger) {
 	jobs, stopJobs := context.WithCancel(context.Background())
 	defer stopJobs()
 	go purgeLoop(jobs, st, logger)
+	// D27: first pass 5 min after start, then hourly ± 5 min.
+	go newRescanner(st, cfg.SafeBrowsingAPIKey, cfg.AlertWebhookURL, logger).
+		Loop(jobs, 5*time.Minute, time.Hour, 5*time.Minute)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,

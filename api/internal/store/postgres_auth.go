@@ -105,7 +105,7 @@ func (p *Postgres) BanUser(ctx context.Context, email, actor, reason string) (mo
 	if err != nil {
 		return model.User{}, 0, 0, err
 	}
-	links, sessions, err := p.banUserByID(ctx, id, "operator:"+actor, reason)
+	links, sessions, err := p.BanUserByID(ctx, id, "operator:"+actor, reason)
 	if err != nil {
 		return model.User{}, 0, 0, err
 	}
@@ -113,9 +113,10 @@ func (p *Postgres) BanUser(ctx context.Context, email, actor, reason string) (mo
 	return u, links, sessions, err
 }
 
-// banUserByID is the D26 cascade. Owner-disabled links are taken down too, so
-// the owner cannot re-enable them after a lifted ban (D6).
-func (p *Postgres) banUserByID(ctx context.Context, id int64, disabledBy, reason string) (links, sessions int, err error) {
+// BanUserByID is the D26 cascade with an explicit actor ("operator:<name>"
+// or "system:safebrowsing"). Owner-disabled links are taken down too, so the
+// owner cannot re-enable them after a lifted ban (D6).
+func (p *Postgres) BanUserByID(ctx context.Context, id int64, disabledBy, reason string) (links, sessions int, err error) {
 	err = pgx.BeginFunc(ctx, p.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `UPDATE users SET is_active = false WHERE id = $1`, id); err != nil {
 			return err

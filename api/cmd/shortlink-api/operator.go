@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azizhudaya/shortlink/api/internal/alert"
+	"github.com/azizhudaya/shortlink/api/internal/rescan"
+	"github.com/azizhudaya/shortlink/api/internal/safety"
 	"github.com/azizhudaya/shortlink/api/internal/store"
 )
 
@@ -29,6 +33,7 @@ const usageText = `usage:
   shortlink-api user enable -email EMAIL -actor NAME
   shortlink-api user whitelist -email EMAIL [-off]
   shortlink-api user list-recent [-days N]
+  shortlink-api links rescan
 `
 
 // minSchemaVersion is the first schema these subcommands understand.
@@ -180,4 +185,51 @@ func runUser(args []string, out io.Writer) error {
 	}
 	defer closeStore()
 	return run(ctx, st)
+}
+
+// safeBrowsingEndpoint is a variable only so the subcommand test can point it
+// at a fake; nothing else changes it.
+var safeBrowsingEndpoint = safety.Endpoint
+
+// newRescanner builds the D27 re-scanner. Its Safe Browsing client gets a
+// longer timeout than the create-time check: a batch carries up to 500 URLs.
+func newRescanner(st rescan.Store, apiKey, webhookURL string, logger *slog.Logger) *rescan.Rescanner {
+	checker := safety.NewSafeBrowsing(safeBrowsingEndpoint, apiKey, &http.Client{Timeout: 10 * time.Second})
+	var notifier alert.Notifier = alert.Nop{}
+	if webhookURL != "" {
+		notifier = alert.NewWebhook(webhookURL, &http.Client{Timeout: 5 * time.Second})
+	}
+	return rescan.New(st, checker, notifier, logger)
+}
+
+// runLinks runs `links rescan`: one D27 pass now, for incident response.
+func runLinks(args []string, out io.Writer) error {
+	if len(args) == 0 || args[0] != "rescan" {
+		return fmt.Errorf("%w: links needs the subcommand rescan", errUsage)
+	}
+	if err := parse(flag.NewFlagSet("links rescan", flag.ContinueOnError), args[1:]); err != nil {
+		return err
+	}
+	apiKey := os.Getenv("SAFE_BROWSING_API_KEY")
+	if apiKey == "" {
+		return errors.New("SAFE_BROWSING_API_KEY is required")
+	}
+
+	ctx := context.Background()
+	st, closeStore, err := openStore(ctx)
+	if err != nil {
+		return err
+	}
+	defer closeStore()
+
+	rep, err := newRescanner(st, apiKey, os.Getenv("ALERT_WEBHOOK_URL"), slog.Default()).RunOnce(ctx)
+	fmt.Fprintf(out, "scanned=%d taken_down=%d banned=%d\n", rep.Scanned, rep.TakenDown, rep.Banned)
+	for _, a := range rep.Actions {
+		user := "none"
+		if a.UserID != nil {
+			user = fmt.Sprint(*a.UserID)
+		}
+		fmt.Fprintf(out, "%s  %s  user=%s  %s\n", a.Code, a.Host, user, a.Action)
+	}
+	return err
 }

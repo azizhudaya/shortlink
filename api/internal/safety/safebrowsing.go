@@ -26,6 +26,14 @@ type Checker interface {
 	Check(ctx context.Context, url string) error
 }
 
+// BatchChecker is the re-scan's view (D27): which of these URLs are listed.
+type BatchChecker interface {
+	CheckBatch(ctx context.Context, urls []string) (flagged map[string]string, err error)
+}
+
+// MaxBatch is the Lookup API's limit on URLs per request.
+const MaxBatch = 500
+
 // SafeBrowsing is a Lookup API v4 client. The endpoint is a parameter so tests
 // can point it at a fake; main passes Google's (D18).
 type SafeBrowsing struct {
@@ -75,6 +83,22 @@ func (s *SafeBrowsing) Check(ctx context.Context, u string) error {
 		return ErrUnsafe
 	}
 	return nil
+}
+
+// CheckBatch maps each listed URL, exactly as sent, to its threat type.
+func (s *SafeBrowsing) CheckBatch(ctx context.Context, urls []string) (map[string]string, error) {
+	if len(urls) > MaxBatch {
+		return nil, fmt.Errorf("safe browsing batch of %d URLs exceeds %d", len(urls), MaxBatch)
+	}
+	resp, err := s.find(ctx, urls)
+	if err != nil {
+		return nil, err
+	}
+	flagged := map[string]string{}
+	for _, m := range resp.Matches {
+		flagged[m.Threat.URL] = m.ThreatType
+	}
+	return flagged, nil
 }
 
 func (s *SafeBrowsing) find(ctx context.Context, urls []string) (findResponse, error) {

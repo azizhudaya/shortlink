@@ -40,6 +40,8 @@ services:
       # Sign-up kill switch (D25): set SIGNUPS_OPEN=false in .env, then
       # `docker compose up -d shortlink-api`. Existing accounts keep working.
       SIGNUPS_OPEN: ${SIGNUPS_OPEN:-true}
+      # Optional ntfy-style URL for re-scan takedown alerts (D27).
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     # The only container on both networks: edge for Caddy, data for Postgres.
     networks: [edge, data]
     mem_limit: 96m

@@ -24,6 +24,10 @@ type Config struct {
 	// SignupsOpen is the D25 kill switch: only the literal "false" closes.
 	SignupsOpen bool
 
+	// AlertWebhookURL, if set, receives a plain-text POST for every re-scan
+	// takedown (D27). Optional: the logs are the record either way.
+	AlertWebhookURL string
+
 	// InsecureCookies drops the __Host- prefix and Secure flag so sign-in
 	// works over http://localhost. Never set in production.
 	InsecureCookies bool
@@ -57,6 +61,7 @@ func Load() Config {
 		GoogleRedirectURL:  redirect,
 		SafeBrowsingAPIKey: os.Getenv("SAFE_BROWSING_API_KEY"),
 		SignupsOpen:        os.Getenv("SIGNUPS_OPEN") != "false",
+		AlertWebhookURL:    os.Getenv("ALERT_WEBHOOK_URL"),
 		InsecureCookies:    os.Getenv("INSECURE_DEV_COOKIES") == "1",
 	}
 }
