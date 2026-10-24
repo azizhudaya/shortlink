@@ -90,10 +90,34 @@ function messageFor(code: string | undefined, message: string | undefined, retry
       return "You've reached today's link limit. New accounts can create 10 links a day for their first week.";
     case 'UNAUTHORIZED':
       return 'Your session has ended. Sign in again.';
+    case 'LINK_TAKEN_DOWN':
+      return "This link was disabled by the operator and can't be changed.";
+    case 'NOT_FOUND':
+      return 'That link no longer exists.';
     case 'CSRF_INVALID':
       return 'Your session token is out of date. Reload the page and try again.';
     default:
       // UNSAFE_URL, SAFETY_CHECK_UNAVAILABLE and the rest carry API copy.
       return message ?? 'Something went wrong. Try again.';
   }
+}
+
+export type LinkStatus = 'active' | 'disabled' | 'taken_down';
+export type LinkItem = CreateResponse & { status: LinkStatus };
+export type LinkPage = { links: LinkItem[]; next_cursor: string | null };
+
+export function listLinks(cursor?: string): Promise<ApiResult<LinkPage>> {
+  const q = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  return request<LinkPage>(`/api/links${q}`);
+}
+
+export function setDisabled(code: string, disabled: boolean): Promise<ApiResult<null>> {
+  return request<null>(`/api/links/${encodeURIComponent(code)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ disabled }),
+  });
+}
+
+export function deleteLink(code: string): Promise<ApiResult<null>> {
+  return request<null>(`/api/links/${encodeURIComponent(code)}`, { method: 'DELETE' });
 }
