@@ -32,6 +32,9 @@ function CreateForm() {
       const res = await createLink({ url, customAlias });
       if (res.ok) {
         setResult(res.data);
+        // Clear both fields: an empty URL also disables Shorten, so the same
+        // link can't be submitted twice. On failure the input is kept to fix.
+        setUrl('');
         setCustomAlias('');
       } else {
         setError(res.message);
