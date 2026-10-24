@@ -7,14 +7,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azizhudaya/shortlink/api/internal/auth"
 	"github.com/azizhudaya/shortlink/api/internal/config"
 	"github.com/azizhudaya/shortlink/api/internal/httpserver"
 	"github.com/azizhudaya/shortlink/api/internal/migrations"
+	"github.com/azizhudaya/shortlink/api/internal/safety"
 	"github.com/azizhudaya/shortlink/api/internal/store"
 )
 
@@ -25,6 +28,10 @@ func main() {
 	cfg := config.Load()
 	if cfg.DatabaseURL == "" {
 		logger.Error("DATABASE_URL is required")
+		os.Exit(1)
+	}
+	if missing := cfg.MissingCredentials(); len(missing) > 0 {
+		logger.Error("required credentials are empty", "missing", strings.Join(missing, ","))
 		os.Exit(1)
 	}
 
@@ -46,7 +53,16 @@ func main() {
 	}
 	defer pool.Close()
 
-	srv := httpserver.NewServer(cfg, store.NewPostgres(pool), logger)
+	google, err := auth.NewGoogle(context.Background(), auth.GoogleIssuer,
+		cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL)
+	if err != nil {
+		logger.Error("google sign-in setup", "error", err)
+		os.Exit(1)
+	}
+	checker := safety.NewSafeBrowsing(safety.Endpoint, cfg.SafeBrowsingAPIKey, &http.Client{Timeout: 3 * time.Second})
+
+	st := store.NewPostgres(pool)
+	srv := httpserver.NewServer(cfg, st, st, google, checker, logger)
 
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,

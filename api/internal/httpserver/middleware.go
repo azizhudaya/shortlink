@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"log/slog"
+	"mime"
 	"net/http"
 	"time"
 )
@@ -90,4 +91,17 @@ func LimitBody(next http.Handler) http.Handler {
 		r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// requireJSON is the M1 Content-Type gate, now on every JSON-body endpoint. A
+// plain HTML form cannot send application/json, and a cross-site fetch that
+// does triggers a CORS preflight this API never answers.
+func requireJSON(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+			writeError(w, http.StatusUnsupportedMediaType, CodeBadRequest, "Content-Type must be application/json.")
+			return
+		}
+		next(w, r)
+	}
 }

@@ -26,6 +26,10 @@ const (
 	CodeBadRequest    = "BAD_REQUEST"
 	CodeNotFound      = "NOT_FOUND"
 	CodeInternalError = "INTERNAL"
+
+	CodeUnauthorized = "UNAUTHORIZED"
+	CodeCSRFInvalid  = "CSRF_INVALID"
+	CodeRateLimited  = "RATE_LIMITED"
 )
 
 func writeError(w http.ResponseWriter, status int, code, message string) {

@@ -1,27 +1,54 @@
 package httpserver
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/azizhudaya/shortlink/api/internal/auth"
 	"github.com/azizhudaya/shortlink/api/internal/config"
+	"github.com/azizhudaya/shortlink/api/internal/ratelimit"
+	"github.com/azizhudaya/shortlink/api/internal/safety"
 	"github.com/azizhudaya/shortlink/api/internal/store"
 	"github.com/azizhudaya/shortlink/api/internal/urlvalidate"
 )
 
+// IdentityProvider is the Google sign-in flow; tests run it against a fake.
+type IdentityProvider interface {
+	AuthURL(auth.FlowState) string
+	Exchange(ctx context.Context, code string, fs auth.FlowState) (auth.Identity, error)
+}
+
 type Server struct {
 	cfg       config.Config
 	store     store.Store
+	auth      store.AuthStore
+	idp       IdentityProvider
+	checker   safety.Checker
 	validator *urlvalidate.Validator
 	logger    *slog.Logger
+
+	// Burst limits (D12). Fields so tests can tighten them.
+	authPerIP *ratelimit.Limiter
 }
 
-func NewServer(cfg config.Config, st store.Store, logger *slog.Logger) *Server {
+// rate-limiter key capacity: beyond it new keys are refused (fail closed).
+const (
+	limiterMaxKeys = 10_000
+	limiterIdleTTL = time.Hour
+)
+
+func NewServer(cfg config.Config, st store.Store, as store.AuthStore, idp IdentityProvider, checker safety.Checker, logger *slog.Logger) *Server {
 	return &Server{
 		cfg:       cfg,
 		store:     st,
+		auth:      as,
+		idp:       idp,
+		checker:   checker,
 		validator: urlvalidate.New(cfg.PublicHostnames),
 		logger:    logger,
+		authPerIP: ratelimit.New(6*time.Second, 10, limiterIdleTTL, limiterMaxKeys),
 	}
 }
 
@@ -39,6 +66,10 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", s.Health)
+	mux.HandleFunc("GET /api/auth/google/start", s.GoogleStart)
+	mux.HandleFunc("GET /api/auth/google/callback", s.GoogleCallback)
+	mux.HandleFunc("POST /api/auth/logout", s.requireSession(s.requireCSRF(s.Logout)))
+	mux.HandleFunc("GET /api/auth/me", s.requireSession(s.Me))
 	mux.HandleFunc("POST /api/links", s.CreateLink)
 	mux.HandleFunc("GET /{code}", s.Redirect)
 
