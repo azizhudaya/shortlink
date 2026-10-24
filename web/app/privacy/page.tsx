@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   title: 'Privacy · Shortlink',
 };
 
-// Contact for data requests. The mailbox must exist before launch.
-const CONTACT = 'privacy@afh.my.id';
+// Contact for data requests: the operator's address.
+const CONTACT = 'azizhudaya39@gmail.com';
 
 export default function PrivacyPage() {
   return (
