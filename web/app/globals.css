@@ -343,6 +343,7 @@ button.danger {
 .qr-downloads {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
@@ -368,7 +369,8 @@ a.button.small {
   border-radius: 1.125rem;
 }
 
-.result a {
+/* Only the short link itself, not links nested in the QR panel. */
+.result > a {
   font-weight: 600;
   letter-spacing: -0.01em;
   word-break: break-all;
