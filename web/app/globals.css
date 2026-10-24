@@ -8,6 +8,9 @@
   --ink: #1d1d1f;
   --mute: #6e6e73;
   --line: #e5e5ea;
+  /* Borders that must stay visible on --tile cards and on the canvas:
+     outline buttons, badges, the theme toggle. */
+  --line-strong: #c7c7cc;
   /* Text links: a deeper green step so they stay readable on light canvas */
   --accent: #0b7a55;
   /* Filled buttons: the logo green, always paired with dark text */
@@ -29,6 +32,7 @@
     --ink: #f5f5f7;
     --mute: #86868b;
     --line: #333336;
+    --line-strong: #48484a;
     --accent: #16b981;
     /* zinc-400: zinc-600 on black is too faint */
     --highlight: #a1a1aa;
@@ -43,6 +47,7 @@
   --ink: #f5f5f7;
   --mute: #86868b;
   --line: #333336;
+  --line-strong: #48484a;
   --accent: #16b981;
   /* zinc-400: zinc-600 on black is too faint */
   --highlight: #a1a1aa;
@@ -178,7 +183,7 @@ button:disabled {
 button.outline {
   background: transparent;
   color: var(--ink);
-  border-color: var(--line);
+  border-color: var(--line-strong);
   padding: 0.5rem 1.125rem;
 }
 
@@ -224,7 +229,7 @@ button.theme-toggle {
   gap: 0;
   justify-content: center;
   background: none;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   color: var(--mute);
 }
 
@@ -358,7 +363,7 @@ button.link-button:hover {
   font-weight: 600;
   border-radius: 999px;
   padding: 0.125rem 0.625rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   white-space: nowrap;
 }
 
