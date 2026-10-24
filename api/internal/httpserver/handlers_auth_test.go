@@ -31,7 +31,25 @@ type testEnv struct {
 	pool     *pgxpool.Pool
 	store    *store.Postgres
 	checker  *fakeChecker
+	clicks   *fakeClicks
 	logs     *syncBuffer
+}
+
+type fakeClicks struct {
+	mu    sync.Mutex
+	codes []string
+}
+
+func (f *fakeClicks) Record(code string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.codes = append(f.codes, code)
+}
+
+func (f *fakeClicks) recorded() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.codes...)
 }
 
 type fakeChecker struct {
@@ -94,9 +112,10 @@ func newEnv(t *testing.T, mutate ...func(*config.Config)) *testEnv {
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
 	checker := &fakeChecker{}
-	s := NewServer(cfg, st, st, g, checker, logger)
+	clicks := &fakeClicks{}
+	s := NewServer(cfg, st, st, g, checker, clicks, logger)
 	handler = s.Routes()
-	return &testEnv{srv: srv, server: s, provider: p, pool: pool, store: st, checker: checker, logs: logs}
+	return &testEnv{srv: srv, server: s, provider: p, pool: pool, store: st, checker: checker, clicks: clicks, logs: logs}
 }
 
 var noFollow = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}

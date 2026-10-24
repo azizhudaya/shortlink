@@ -81,7 +81,7 @@ The domain is registered and incurring renewal cost while idle. The hosting subs
 
 - Competing with commercial shorteners on features or scale.
 - Unmoderated anonymous shortening. Anyone with a verified Google account may sign up, but creation always requires an account and runs behind the abuse controls in §13.2.
-- Click analytics, campaign attribution, or UTM management in this release (§4.2).
+- Click analytics dashboards, campaign attribution, or UTM management in this release (§4.2). Only per-link daily click counts are recorded (FR-26).
 - Multi-tenant billing, teams, or shared link ownership.
 - High availability. The service is a single instance on a single host by design (§17).
 
@@ -129,6 +129,7 @@ The person running the service. Deploys releases, responds to abuse reports, res
 - Link creation requires authentication; links are stamped with an owner
 - Per-user link listing, disable, and delete
 - QR code for each short link, downloadable as PNG and SVG
+- Click counts per link per day, recorded in the database (no UI yet)
 - Abuse controls replacing closed registration: Safe Browsing check on create, hourly Safe Browsing re-scan with auto-takedown, new-account daily quota, sign-up kill switch, one-command account ban and unban, whitelist for trusted users
 
 **Milestone 3 — Production readiness (GA gate)**
@@ -142,7 +143,7 @@ The person running the service. Deploys releases, responds to abuse reports, res
 
 | Excluded | Why |
 |---|---|
-| Click analytics and counters | Adds a write on the hottest path and a caching layer to keep it fast. The redirect stays a single indexed read in this release. 302 preserves the option (§9.2). |
+| Click analytics UI, per-visitor data | v2.1 records only daily counts per link (FR-26), batched off the redirect path so it stays a single indexed read. Showing them, and any per-visitor detail, is out of scope. |
 | Link expiry and scheduled deactivation | Manual disable covers the real need. Revisit if a use case appears. |
 | Bulk import/export | Not needed at expected link volume. |
 | Password-protected or one-time links | Meaningful additional threat surface for a use case that has not come up. |
@@ -357,6 +358,7 @@ So that an abusive destination stops resolving before it damages the domain's re
 | FR-22 | Hourly Safe Browsing re-scan of the last 30 days of active links, with auto-takedown and auto-ban of new or repeat-offender owners | P0 |
 | FR-23 | Operator can lift a ban; links taken down by it stay down until reviewed | P1 |
 | FR-24 | Whitelisted users have no daily quota; all other controls still apply | P1 |
+| FR-26 | Redirects served are counted per link per UTC day in `link_clicks_daily`: counts only, no visitor identifiers; the redirect path does no extra I/O (in-memory counter, flushed in batches each minute). Viewed by SQL for now; no UI. | P1 |
 | FR-25 | Owner can show a QR code for any of their links that isn't taken down, and download it as PNG and SVG; it encodes only the short URL and is generated in the browser | P1 |
 
 ### 5.5 Non-functional requirements
@@ -563,6 +565,13 @@ create table links (
     created_at    timestamptz not null default now(),
     deleted_at    timestamptz                 -- owner soft delete (v2.1)
 );
+
+create table link_clicks_daily (               -- v2.1: counts only, no visitor data
+    short_code varchar(32) not null references links(short_code) on delete cascade,
+    day        date        not null,          -- UTC
+    clicks     bigint      not null check (clicks >= 0),
+    primary key (short_code, day)
+);
 create index links_user_id_created_at_idx on links (user_id, created_at desc, short_code desc);
 
 create table link_creations (                  -- quota ledger; survives link deletes
@@ -584,7 +593,7 @@ create index link_creations_user_time_idx on link_creations (user_id, created_at
 
 **`disabled_at` rather than deletion for takedowns.** A disabled code stays in the table, so it cannot be re-registered by whoever caused the takedown. Owner-initiated deletion is a soft delete as of v2.1: `deleted_at` is set, the link 404s and disappears from the owner's list, and the row keeps the code reserved, so a printed link or QR code can never be taken over by whoever registers the code next.
 
-**No `click_count`.** Deliberately absent. Adding a counter turns every redirect from one read into a read plus a write, which is the single change most likely to break NFR-01. When analytics arrive they will be a separate append-only table with a cache in front, not a column here.
+**No `click_count` column.** As of v2.1 clicks are counted in the separate `link_clicks_daily` table, as planned here: the redirect bumps an in-memory counter and a background job adds the totals once a minute, so the redirect is still one read. The original reasoning stands: Adding a counter turns every redirect from one read into a read plus a write, which is the single change most likely to break NFR-01. When analytics arrive they will be a separate append-only table with a cache in front, not a column here.
 
 **No PII beyond email and the Google account ID.** Session rows record IP and user agent for revocation and abuse review, with a 30-day lifetime tied to session expiry. Redirects are not logged with visitor identifiers (§14).
 
@@ -845,7 +854,7 @@ The service is operated from Indonesia and stores personal data of registered us
 | Email address | Display copy of the Google email, refreshed at sign-in. Not shared, not used beyond identifying the account. |
 | Destination URLs | Sent to Google Safe Browsing at creation and during re-scans, to keep phishing and malware off the domain. |
 | Session IP and user agent | Retained 30 days for session revocation and abuse review, deleted with the session. |
-| Visitor identity on redirect | **Not collected.** No cookies are set on the redirect path, no per-visitor logging, no fingerprinting. |
+| Visitor identity on redirect | **Not collected.** No cookies are set on the redirect path, no per-visitor logging, no fingerprinting. Only an anonymous count per link per day is kept (FR-26). |
 
 **Deletion.** Account deletion removes the user row and cascades to sessions and links. Backups age out within the retention window; deletion is not retroactively applied to existing backup files, which is stated here rather than left implicit.
 
@@ -924,7 +933,7 @@ Stated explicitly so they are not rediscovered later as surprises.
 
 **Brief downtime per release.** Compose stops the old container before the new one is ready, giving a few seconds of 502. Accepted: zero-downtime deployment needs health-gated rollout or blue-green, disproportionate at this scale.
 
-**No analytics.** Owners cannot tell whether a link was ever followed. Accepted for this release to protect NFR-01; 302 keeps the option open.
+**No analytics UI.** Daily click counts are recorded (FR-26) but not yet shown to owners. Counts are redirects served, not unique people: bots and link previews that follow redirects are included, and up to a minute of counts can be lost if the process crashes. Accepted to keep the redirect a single read (NFR-01).
 
 **Open registration (v2.1).** Anyone with a verified Google account can sign up. This gives up the single most effective abuse control (closed registration) because users won't create yet another password-based account and invites add friction the product doesn't want. Accepted with compensating controls (§13.2) and mandatory weekly review (§13.3); the schema allows re-introducing a gate if abuse recurs.
 
@@ -986,5 +995,5 @@ Stated explicitly so they are not rediscovered later as surprises.
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-07-30 | Initial document. Scoped M0—M2, framed as a learning project with learning-verification gates. |
-| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, owner deletion becomes a soft delete (`links.deleted_at`; codes stay reserved), schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
+| 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, daily click counts recorded in the database (FR-26), owner deletion becomes a soft delete (`links.deleted_at`; codes stay reserved), schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
 | 2.0 | 2026-07-31 | Reframed as a product release. Learning framing and verification gates removed. Added: system architecture with the repository model, platform contract, and resource budget (§7), delivery pipeline (§11), operations with SLOs, backup, and runbook (§12), abuse and acceptable use (§13), privacy under UU PDP (§14), M3 GA gate with pre-launch checklist (§15), expanded security requirements (§10), takedown story and disable fields in the schema. Availability target set at 99.5% with rationale. |

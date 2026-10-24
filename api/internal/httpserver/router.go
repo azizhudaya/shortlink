@@ -14,6 +14,16 @@ import (
 	"github.com/azizhudaya/shortlink/api/internal/urlvalidate"
 )
 
+// ClickRecorder counts a served redirect (D32). It must not block: the
+// redirect path stays a single database read.
+type ClickRecorder interface {
+	Record(code string)
+}
+
+type noClicks struct{}
+
+func (noClicks) Record(string) {}
+
 // IdentityProvider is the Google sign-in flow; tests run it against a fake.
 type IdentityProvider interface {
 	AuthURL(auth.FlowState) string
@@ -26,6 +36,7 @@ type Server struct {
 	auth      store.AuthStore
 	idp       IdentityProvider
 	checker   safety.Checker
+	clicks    ClickRecorder
 	validator *urlvalidate.Validator
 	logger    *slog.Logger
 
@@ -45,13 +56,17 @@ const (
 	limiterIdleTTL = time.Hour
 )
 
-func NewServer(cfg config.Config, st store.Store, as store.AuthStore, idp IdentityProvider, checker safety.Checker, logger *slog.Logger) *Server {
+func NewServer(cfg config.Config, st store.Store, as store.AuthStore, idp IdentityProvider, checker safety.Checker, clicks ClickRecorder, logger *slog.Logger) *Server {
+	if clicks == nil {
+		clicks = noClicks{}
+	}
 	return &Server{
 		cfg:            cfg,
 		store:          st,
 		auth:           as,
 		idp:            idp,
 		checker:        checker,
+		clicks:         clicks,
 		validator:      urlvalidate.New(cfg.PublicHostnames),
 		logger:         logger,
 		authPerIP:      ratelimit.New(6*time.Second, 10, limiterIdleTTL, limiterMaxKeys),

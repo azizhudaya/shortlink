@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azizhudaya/shortlink/api/internal/auth"
+	"github.com/azizhudaya/shortlink/api/internal/clicks"
 	"github.com/azizhudaya/shortlink/api/internal/config"
 	"github.com/azizhudaya/shortlink/api/internal/httpserver"
 	"github.com/azizhudaya/shortlink/api/internal/migrations"
@@ -89,12 +90,20 @@ func serve(logger *slog.Logger) {
 	checker := safety.NewSafeBrowsing(safety.Endpoint, cfg.SafeBrowsingAPIKey, &http.Client{Timeout: 3 * time.Second})
 
 	st := store.NewPostgres(pool)
-	srv := httpserver.NewServer(cfg, st, st, google, checker, logger)
+	counter := clicks.New(st, logger)
+	srv := httpserver.NewServer(cfg, st, st, google, checker, counter, logger)
 
 	// Background jobs share one context, cancelled on shutdown.
 	jobs, stopJobs := context.WithCancel(context.Background())
 	defer stopJobs()
 	go purgeLoop(jobs, st, logger)
+	// D32: click counts reach the database once a minute; the final flush
+	// runs after the HTTP server has drained (see below).
+	countsDone := make(chan struct{})
+	go func() {
+		counter.Run(jobs, time.Minute)
+		close(countsDone)
+	}()
 	// D27: first pass 5 min after start, then hourly ± 5 min.
 	go newRescanner(st, cfg.SafeBrowsingAPIKey, cfg.AlertWebhookURL, logger).
 		Loop(jobs, 5*time.Minute, time.Hour, 5*time.Minute)
@@ -122,12 +131,15 @@ func serve(logger *slog.Logger) {
 	<-stop
 
 	logger.Info("shutting down")
-	stopJobs()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "error", err)
 	}
+	// Stop the jobs only after in-flight redirects finished, so their clicks
+	// are in the final flush.
+	stopJobs()
+	<-countsDone
 }
 
 // purgeLoop deletes expired sessions and aged-out quota rows hourly (D14).

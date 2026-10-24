@@ -38,7 +38,8 @@ export default function PrivacyPage() {
 
       <h2>When someone opens a short link</h2>
       <p>
-        Nothing about the visitor is recorded: no IP address, no cookie, no tracking. The redirect also tells the
+        Nothing about the visitor is recorded: no IP address, no cookie, no tracking. The only thing kept is a count of
+        how many times each link was opened per day. The redirect also tells the
         destination site nothing about the short link it came from.
       </p>
 

@@ -30,7 +30,8 @@ const gonePage = `<!doctype html>
 </body></html>
 `
 
-// Redirect serves the hottest path: one primary-key read and one 302.
+// Redirect serves the hottest path: one primary-key read and one 302. A
+// served redirect also bumps an in-memory click counter (D32) — no I/O.
 //
 // 302, not 301: browsers cache 301 aggressively and often indefinitely,
 // which would make a takedown unenforceable for anyone who has already
@@ -56,6 +57,10 @@ func (s *Server) Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Count real follows only: HEAD (link checkers, previews) is not a click.
+	if r.Method == http.MethodGet {
+		s.clicks.Record(code)
+	}
 	http.Redirect(w, r, link.LongURL, http.StatusFound)
 }
 

@@ -98,6 +98,10 @@ down: look at that user's links and `user disable` them if abusive. Set
 `rescan stopped: safe browsing unavailable` warnings mean the key or its quota
 needs attention.
 
+**Click counts** (D32): redirects served per link per UTC day, written once a minute. No UI yet:
+`SELECT short_code, sum(clicks) AS clicks FROM link_clicks_daily GROUP BY short_code ORDER BY clicks DESC LIMIT 20;`
+`SELECT day, clicks FROM link_clicks_daily WHERE short_code = 'X' ORDER BY day;`
+
 **Restore a deleted link** (D31): owner deletes are soft, so the row is still there:
 `UPDATE links SET deleted_at = NULL WHERE short_code = 'X';`
 
