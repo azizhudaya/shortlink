@@ -29,8 +29,14 @@ type Server struct {
 	validator *urlvalidate.Validator
 	logger    *slog.Logger
 
-	// Burst limits (D12). Fields so tests can tighten them.
-	authPerIP *ratelimit.Limiter
+	// Burst limits (D12) and the daily quota (D24). Fields so tests can
+	// override them.
+	authPerIP      *ratelimit.Limiter
+	createPerUser  *ratelimit.Limiter
+	createPerIP    *ratelimit.Limiter
+	newAccountDays int
+	newAccountCap  int
+	quotaCap       int
 }
 
 // rate-limiter key capacity: beyond it new keys are refused (fail closed).
@@ -41,14 +47,19 @@ const (
 
 func NewServer(cfg config.Config, st store.Store, as store.AuthStore, idp IdentityProvider, checker safety.Checker, logger *slog.Logger) *Server {
 	return &Server{
-		cfg:       cfg,
-		store:     st,
-		auth:      as,
-		idp:       idp,
-		checker:   checker,
-		validator: urlvalidate.New(cfg.PublicHostnames),
-		logger:    logger,
-		authPerIP: ratelimit.New(6*time.Second, 10, limiterIdleTTL, limiterMaxKeys),
+		cfg:            cfg,
+		store:          st,
+		auth:           as,
+		idp:            idp,
+		checker:        checker,
+		validator:      urlvalidate.New(cfg.PublicHostnames),
+		logger:         logger,
+		authPerIP:      ratelimit.New(6*time.Second, 10, limiterIdleTTL, limiterMaxKeys),
+		createPerUser:  ratelimit.New(time.Minute, 20, limiterIdleTTL, limiterMaxKeys),
+		createPerIP:    ratelimit.New(30*time.Second, 30, limiterIdleTTL, limiterMaxKeys),
+		newAccountDays: 7,
+		newAccountCap:  10,
+		quotaCap:       100,
 	}
 }
 
@@ -70,7 +81,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/auth/google/callback", s.GoogleCallback)
 	mux.HandleFunc("POST /api/auth/logout", s.requireSession(s.requireCSRF(s.Logout)))
 	mux.HandleFunc("GET /api/auth/me", s.requireSession(s.Me))
-	mux.HandleFunc("POST /api/links", s.CreateLink)
+	mux.HandleFunc("POST /api/links", s.requireSession(s.requireCSRF(requireJSON(s.CreateLink))))
+	mux.HandleFunc("GET /api/links", s.requireSession(s.ListLinks))
+	mux.HandleFunc("PATCH /api/links/{code}", s.requireSession(s.requireCSRF(requireJSON(s.PatchLink))))
+	mux.HandleFunc("DELETE /api/links/{code}", s.requireSession(s.requireCSRF(s.DeleteLink)))
 	mux.HandleFunc("GET /{code}", s.Redirect)
 
 	return Chain(mux,

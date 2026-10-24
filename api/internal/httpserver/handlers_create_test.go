@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// The Content-Type gate runs before validation or storage, so a zero Server
-// is enough: any request that gets past it would panic on the nil store.
+// The Content-Type gate runs before the handler, so a zero Server is enough:
+// any request that gets past it would panic on the nil store.
 func TestCreateLinkRejectsNonJSON(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -28,7 +28,7 @@ func TestCreateLinkRejectsNonJSON(t *testing.T) {
 			}
 			rec := httptest.NewRecorder()
 
-			(&Server{}).CreateLink(rec, req)
+			requireJSON((&Server{}).CreateLink)(rec, req)
 
 			if rec.Code != http.StatusUnsupportedMediaType {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)

@@ -30,6 +30,11 @@ const (
 	CodeUnauthorized = "UNAUTHORIZED"
 	CodeCSRFInvalid  = "CSRF_INVALID"
 	CodeRateLimited  = "RATE_LIMITED"
+
+	CodeQuotaExceeded     = "QUOTA_EXCEEDED"
+	CodeUnsafeURL         = "UNSAFE_URL"
+	CodeSafetyUnavailable = "SAFETY_CHECK_UNAVAILABLE"
+	CodeLinkTakenDown     = "LINK_TAKEN_DOWN"
 )
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
