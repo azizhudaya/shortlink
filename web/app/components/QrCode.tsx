@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import { makeQr, qrFileName, type QrImages } from '@/lib/qr';
 
-// A "Show QR Code" toggle that reveals the code for a short URL with PNG and SVG
+// A "Show QR" toggle that reveals the code for a short URL with PNG and SVG
 // downloads. Nothing is generated until it is first opened.
 export default function QrCode({ shortUrl }: { shortUrl: string }) {
   const [open, setOpen] = useState(false);
@@ -33,7 +33,7 @@ export default function QrCode({ shortUrl }: { shortUrl: string }) {
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
       >
-        {open ? 'Hide QR Code' : 'Show QR Code'}
+        {open ? 'Hide QR' : 'Show QR'}
       </button>
 
       {open && (

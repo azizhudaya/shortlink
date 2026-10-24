@@ -395,13 +395,48 @@ button.danger {
   color: var(--error);
 }
 
+/* Slightly tighter text buttons so Copy, QR and both icons share one row
+   down to ~360 px wide phones; narrower screens wrap the icons. */
+.actions button.outline {
+  padding: 0.5rem 0.875rem;
+}
+
+/* Disable/enable and delete: round icon buttons pushed to the row's end. */
+.row-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+button.icon-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+button.icon-button:hover:not(:disabled) {
+  border-color: var(--mute);
+}
+
+button.icon-button.danger {
+  color: var(--error);
+}
+
 /* QR code panel (D30). The code itself is always black on white. */
+/* The wrapper adds no box: its toggle sits in the surrounding button row and
+   its panel, when open, drops onto a full-width line after everything else. */
 .qr {
-  flex-basis: 100%;
-  margin-top: 0.75rem;
+  display: contents;
 }
 
 .qr-panel {
+  order: 10;
+  flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;

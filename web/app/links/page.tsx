@@ -138,6 +138,7 @@ function LinkRow({
   onDelete: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const shortLabel = link.short_url.replace(/^https:\/\//, '');
 
   async function onCopy() {
     await navigator.clipboard.writeText(link.short_url);
@@ -148,7 +149,7 @@ function LinkRow({
     <li className="link-row">
       <div className="link-head">
         <a href={link.short_url} className="short">
-          {link.short_url.replace(/^https:\/\//, '')}
+          {shortLabel}
         </a>
         <span className={`badge badge-${link.status}`}>{statusLabel[link.status]}</span>
       </div>
@@ -161,24 +162,95 @@ function LinkRow({
           {new Date(link.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
         </time>
       </p>
+      {/* One row: Copy and QR on the left, icon tools on the right. The QR
+          panel, when open, wraps onto its own line below (CSS order). */}
       <div className="actions">
         <button type="button" className="outline" onClick={onCopy}>
           {copied ? 'Copied' : 'Copy'}
         </button>
+        {/* Nothing else for a taken-down link: a QR or a toggle would only lead to a 410. */}
         {link.status !== 'taken_down' && (
           <>
-            <button type="button" className="outline" disabled={busy} onClick={onToggle}>
-              {link.status === 'active' ? 'Disable' : 'Enable'}
-            </button>
-            <button type="button" className="outline danger" disabled={busy} onClick={onDelete}>
-              Delete
-            </button>
+            <QrCode shortUrl={link.short_url} />
+            <div className="row-tools">
+              <IconButton
+                label={`${link.status === 'active' ? 'Disable' : 'Enable'} ${shortLabel}`}
+                disabled={busy}
+                onClick={onToggle}
+              >
+                {link.status === 'active' ? <PauseIcon /> : <PlayIcon />}
+              </IconButton>
+              <IconButton label={`Delete ${shortLabel}`} danger disabled={busy} onClick={onDelete}>
+                <TrashIcon />
+              </IconButton>
+            </div>
           </>
         )}
       </div>
-      {/* No QR for a taken-down link: it would only lead to a 410 page. */}
-      {link.status !== 'taken_down' && <QrCode shortUrl={link.short_url} />}
     </li>
+  );
+}
+
+function IconButton({
+  label,
+  danger,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  danger?: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={danger ? 'icon-button danger' : 'icon-button'}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+const iconProps = {
+  viewBox: '0 0 24 24',
+  width: 18,
+  height: 18,
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+};
+
+function PauseIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M9 5v14M15 5v14" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M7 5l12 7-12 7z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </svg>
   );
 }
 
