@@ -6,9 +6,9 @@
 | **Status** | Approved for build |
 | **Author / Owner** | Aziz Fikri Hudaya |
 | **Type** | Technical PRD (product release) |
-| **Version** | 2.1 |
-| **Supersedes** | v2.0 (2026-07-31) |
-| **Date** | 2026-10-24 |
+| **Version** | 2.2 |
+| **Supersedes** | v2.1 (2026-10-24) |
+| **Date** | 2026-10-25 |
 | **Scope** | Public release (GA) — creation, redirect, accounts, operations |
 
 ---
@@ -359,6 +359,7 @@ So that an abusive destination stops resolving before it damages the domain's re
 | FR-22 | Hourly Safe Browsing re-scan of the last 30 days of active links, with auto-takedown and auto-ban of new or repeat-offender owners | P0 |
 | FR-23 | Operator can lift a ban; links taken down by it stay down until reviewed | P1 |
 | FR-24 | Whitelisted users have no daily quota; all other controls still apply | P1 |
+| FR-28 | `GET /` on the redirect domain (`afh.my.id/`, no code) answers 302 to the app (`https://app.afh.my.id/`, configurable as `APP_URL`). Temporary, so a landing page can replace it later. Short codes are unaffected. | P2 |
 | FR-27 | Light and dark theme on every page. Default follows the device setting; a sun/moon icon toggle switches it and the choice is remembered in that browser (switching back to the device's theme forgets it). No flash of the wrong theme on load. QR codes stay black on white. | P2 |
 | FR-26 | Redirects served are counted per link per UTC day in `link_clicks_daily`: counts only, no visitor identifiers; the redirect path does no extra I/O (in-memory counter, flushed in batches each minute). Viewed by SQL for now; no UI. | P1 |
 | FR-25 | Owner can show a QR code for any of their links that isn't taken down, and download it as PNG and SVG; it encodes only the short URL and is generated in the browser | P1 |
@@ -610,6 +611,7 @@ create index link_creations_user_time_idx on link_creations (user_id, created_at
 | Method | Path | Response |
 |---|---|---|
 | `GET` | `/{code}` | 302 + `Location` Â· 404 unknown Â· 410 disabled |
+| `GET` | `/` | 302 to the app (v2.2, FR-28) |
 | `GET` | `/healthz` | 200 with process and database status |
 
 **Authentication** — all on `app.afh.my.id/api`
@@ -997,5 +999,6 @@ Stated explicitly so they are not rediscovered later as surprises.
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-07-30 | Initial document. Scoped M0—M2, framed as a learning project with learning-verification gates. |
+| 2.2 | 2026-10-25 | The bare redirect domain (`afh.my.id/`) redirects to the app (FR-28, 302). |
 | 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, daily click counts recorded in the database (FR-26), light/dark theme toggle (FR-27), owner deletion becomes a soft delete (`links.deleted_at`; codes stay reserved), schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |
 | 2.0 | 2026-07-31 | Reframed as a product release. Learning framing and verification gates removed. Added: system architecture with the repository model, platform contract, and resource budget (§7), delivery pipeline (§11), operations with SLOs, backup, and runbook (§12), abuse and acceptable use (§13), privacy under UU PDP (§14), M3 GA gate with pre-launch checklist (§15), expanded security requirements (§10), takedown story and disable fields in the schema. Availability target set at 99.5% with rationale. |

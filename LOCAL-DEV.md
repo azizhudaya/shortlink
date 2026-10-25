@@ -120,6 +120,7 @@ Open `http://localhost:3000`.
 | Create API (via the dev proxy) | `localhost:3000/api/links` |
 | Create API (direct) | `localhost:8080/api/links` |
 | **Redirects** | `localhost:8080/{code}` |
+| Bare domain → app | `localhost:8080/` (302 to `APP_URL`; set `APP_URL=http://localhost:3000` locally) |
 | Health | `localhost:8080/healthz` |
 
 **Redirects are only on :8080.** The web app proxies `/api/*` and nothing

@@ -91,6 +91,7 @@ func NewServer(cfg config.Config, st store.Store, as store.AuthStore, idp Identi
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /{$}", s.Home) // exactly "/", never a short code
 	mux.HandleFunc("GET /healthz", s.Health)
 	mux.HandleFunc("GET /api/auth/google/start", s.GoogleStart)
 	mux.HandleFunc("GET /api/auth/google/callback", s.GoogleCallback)

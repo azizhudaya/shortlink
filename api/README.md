@@ -41,6 +41,7 @@ it is not free to change.
 | Method | Path | Auth | Behaviour |
 |---|---|---|---|
 | `GET` | `/{code}` | — | 302 · 404 unknown · 410 disabled (FR-07). No cookie, no session lookup. |
+| `GET` | `/` | — | 302 to `APP_URL` (default `https://app.afh.my.id`), FR-28 |
 | `GET` | `/healthz` | — | 200 with process + database reachability (FR-17) |
 | `GET` | `/api/auth/google/start` | — | 302 to Google + oauth cookie |
 | `GET` | `/api/auth/google/callback` | oauth cookie | 302 `/links` + session cookie, or `/signin?error=…` |

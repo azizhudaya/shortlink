@@ -8,6 +8,9 @@ import (
 // DefaultGoogleRedirectURL is the production OAuth callback (D17).
 const DefaultGoogleRedirectURL = "https://app.afh.my.id/api/auth/google/callback"
 
+// DefaultAppURL is where the bare redirect domain sends visitors (FR-28).
+const DefaultAppURL = "https://app.afh.my.id"
+
 // Config is loaded entirely from the environment (set by docker-compose.yml
 // / afh-infra's platform contract), never from a file. Secrets come from the
 // VPS .env through compose and never appear in the repo (D17).
@@ -20,6 +23,9 @@ type Config struct {
 	GoogleClientSecret string
 	GoogleRedirectURL  string
 	SafeBrowsingAPIKey string
+
+	// AppURL is the app's origin; GET / on the redirect domain goes there.
+	AppURL string
 
 	// SignupsOpen is the D25 kill switch: only the literal "false" closes.
 	SignupsOpen bool
@@ -47,6 +53,11 @@ func Load() Config {
 		}
 	}
 
+	appURL := strings.TrimRight(os.Getenv("APP_URL"), "/")
+	if appURL == "" {
+		appURL = DefaultAppURL
+	}
+
 	redirect := os.Getenv("GOOGLE_REDIRECT_URL")
 	if redirect == "" {
 		redirect = DefaultGoogleRedirectURL
@@ -59,6 +70,7 @@ func Load() Config {
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  redirect,
+		AppURL:             appURL,
 		SafeBrowsingAPIKey: os.Getenv("SAFE_BROWSING_API_KEY"),
 		SignupsOpen:        os.Getenv("SIGNUPS_OPEN") != "false",
 		AlertWebhookURL:    os.Getenv("ALERT_WEBHOOK_URL"),
