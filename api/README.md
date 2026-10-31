@@ -1,8 +1,8 @@
 # api — Go service
 
 The backend component of the `shortlink` repo: serves public redirects
-(`GET /{code}` on `afh.my.id`) and the creation/management API (`/api/*` on
-`app.afh.my.id`). Owns the database migrations.
+(`GET /{code}` on `afhs.my.id`) and the creation/management API (`/api/*` on
+`app.afhs.my.id`). Owns the database migrations.
 
 Repo-level context — the platform contract, hostname routing, deploy, and the
 repository model — is in [`../README.md`](../README.md). The canonical product
@@ -41,7 +41,7 @@ it is not free to change.
 | Method | Path | Auth | Behaviour |
 |---|---|---|---|
 | `GET` | `/{code}` | — | 302 · 404 unknown · 410 disabled (FR-07). No cookie, no session lookup. |
-| `GET` | `/` | — | 302 to `APP_URL` (default `https://app.afh.my.id`), FR-28 |
+| `GET` | `/` | — | 302 to `APP_URL` (default `https://app.afhs.my.id`), FR-28 |
 | `GET` | `/healthz` | — | 200 with process + database reachability (FR-17) |
 | `GET` | `/api/auth/google/start` | — | 302 to Google + oauth cookie |
 | `GET` | `/api/auth/google/callback` | oauth cookie | 302 `/links` + session cookie, or `/signin?error=…` |
@@ -74,7 +74,7 @@ shortlink-api links rescan                                         # one Safe Br
 ```bash
 set -a; source ~/.config/shortlink/dev.env; set +a   # GOOGLE_* + SAFE_BROWSING_API_KEY
 export DATABASE_URL='postgres://shortlink_api:...@localhost:5432/shortlink?sslmode=disable'
-export PUBLIC_HOSTNAMES='afh.my.id,app.afh.my.id'
+export PUBLIC_HOSTNAMES='afhs.my.id,app.afhs.my.id'
 export INSECURE_DEV_COOKIES=1 GOOGLE_REDIRECT_URL=http://localhost:3000/api/auth/google/callback
 go run ./cmd/shortlink-api
 ```

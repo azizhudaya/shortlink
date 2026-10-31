@@ -15,7 +15,7 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: 'Shortlink',
-  description: 'Create short links on afh.my.id',
+  description: 'Create short links on afhs.my.id',
   // Private tool, not a public page: keep it out of search engines.
   robots: { index: false, follow: false },
 };

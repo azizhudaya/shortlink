@@ -17,7 +17,7 @@ func TestHomeRedirectsToApp(t *testing.T) {
 		name, appURL, want string
 	}{
 		{name: "configured", appURL: "https://app.example.test", want: "https://app.example.test/"},
-		{name: "default", appURL: "", want: "https://app.afh.my.id/"},
+		{name: "default", appURL: "", want: "https://app.afhs.my.id/"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

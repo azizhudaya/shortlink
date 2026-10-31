@@ -1,4 +1,4 @@
-# shortlink: both application containers for the afh.my.id shortlink service.
+# shortlink: both application containers for the afhs.my.id shortlink service.
 #
 # One repo, two images, two independently deployable containers. Merging the
 # former shortlink-api and shortlink-web compose files into this one does NOT
@@ -31,7 +31,10 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://shortlink_api:${SHORTLINK_DB_PASSWORD}@postgres:5432/shortlink?sslmode=disable
-      PUBLIC_HOSTNAMES: afh.my.id,app.afh.my.id
+      # First entry builds short URLs. The legacy afh.my.id hosts stay listed so
+      # links to them are rejected as own-domain: Caddy redirects them back
+      # here (FR-29).
+      PUBLIC_HOSTNAMES: afhs.my.id,app.afhs.my.id,afh.my.id,app.afh.my.id
       PORT: "8080"
       # Secrets come only from /srv/shortlink/.env (0600); never committed (D17).
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}

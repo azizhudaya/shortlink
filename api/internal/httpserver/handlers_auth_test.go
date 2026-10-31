@@ -93,7 +93,7 @@ func newEnv(t *testing.T, mutate ...func(*config.Config)) *testEnv {
 	t.Cleanup(srv.Close)
 
 	cfg := config.Config{
-		PublicHostnames:   []string{"afh.my.id", "app.afh.my.id"},
+		PublicHostnames:   []string{"afhs.my.id", "app.afhs.my.id"},
 		SignupsOpen:       true,
 		GoogleRedirectURL: srv.URL + "/api/auth/google/callback",
 	}

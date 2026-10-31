@@ -1,4 +1,4 @@
-# Technical PRD — Shortlink Service (`afh.my.id`)
+# Technical PRD — Shortlink Service (`afhs.my.id`)
 
 | | |
 |---|---|
@@ -6,18 +6,18 @@
 | **Status** | Approved for build |
 | **Author / Owner** | Aziz Fikri Hudaya |
 | **Type** | Technical PRD (product release) |
-| **Version** | 2.2 |
-| **Supersedes** | v2.1 (2026-10-24) |
-| **Date** | 2026-10-25 |
+| **Version** | 2.3 |
+| **Supersedes** | v2.2 (2026-10-25) |
+| **Date** | 2026-10-30 |
 | **Scope** | Public release (GA) — creation, redirect, accounts, operations |
 
 ---
 
 ## Executive Summary
 
-**One-liner:** A self-hosted link shortening service on `afh.my.id` that turns long URLs into short, durable, owner-controlled links.
+**One-liner:** A self-hosted link shortening service on `afhs.my.id` that turns long URLs into short, durable, owner-controlled links.
 
-**Overview.** Shortlink is a production service, not a demo. It takes a long URL and returns a short one — `afh.my.id/abc123` or a custom alias — and resolves that link reliably for anyone who follows it. Accounts give each user a private inventory of their own links with the ability to list, disable, and delete them.
+**Overview.** Shortlink is a production service, not a demo. It takes a long URL and returns a short one — `afhs.my.id/abc123` or a custom alias — and resolves that link reliably for anyone who follows it. Accounts give each user a private inventory of their own links with the ability to list, disable, and delete them.
 
 The service is built on the assumption that **a short link is a durable public commitment**. Once a link is shared into a chat, a slide deck, or a printed QR code, it must keep resolving. That assumption drives every requirement in this document: availability targets over feature count, encrypted off-box backups, an explicit abuse-takedown path, and a deployment pipeline where a bad release can be rolled back in under two minutes.
 
@@ -43,11 +43,11 @@ Long URLs are hostile to sharing. They break across lines in chat, overflow slid
 
 That fix introduces a worse problem: **the link stops belonging to the person who made it.** A third-party shortener decides whether the link keeps resolving, what interstitial page appears, what data is collected from every click, and whether the service continues to exist. Shortener shutdowns are common enough to be a known category of link rot, and when one happens every link ever created dies at once — including links already printed on physical material. The person who shared the link has no recourse and usually no warning.
 
-A branded domain also carries information the generic shorteners strip away. `afh.my.id/cv` tells a recipient who is behind the link; `bit.ly/3xK9pQ` tells them nothing, and increasingly reads as a phishing signal to cautious recipients.
+A branded domain also carries information the generic shorteners strip away. `afhs.my.id/cv` tells a recipient who is behind the link; `bit.ly/3xK9pQ` tells them nothing, and increasingly reads as a phishing signal to cautious recipients.
 
 ### 1.2 Current state
 
-Today the operator either shares raw long URLs, accepting the formatting and readability cost, or uses a public shortener and accepts the loss of control. The domain `afh.my.id` is registered and unused. Infrastructure to host a service — a VPS with a reverse proxy and a database — is already provisioned and running.
+Today the operator either shares raw long URLs, accepting the formatting and readability cost, or uses a public shortener and accepts the loss of control. The domain `afhs.my.id` is registered and unused. Infrastructure to host a service — a VPS with a reverse proxy and a database — is already provisioned and running.
 
 ### 1.3 Impact
 
@@ -177,7 +177,7 @@ So that I can share it without the URL dominating the message.
 - [ ] Given the response, when it renders, then a copy control places the short URL on the clipboard in one action
 - [ ] Given a URL with no scheme (`example.com/page`), when submitted, then `https://` is assumed and the link is created
 - [ ] Given a `javascript:`, `data:`, or `file:` URL, when submitted, then creation is rejected with a clear message
-- [ ] Given a URL pointing at `afh.my.id` or `app.afh.my.id`, when submitted, then creation is rejected to prevent redirect loops
+- [ ] Given a URL pointing at `afhs.my.id`, `app.afhs.my.id`, or the legacy `afh.my.id` / `app.afh.my.id`, when submitted, then creation is rejected to prevent redirect loops
 - [ ] Given a URL resolving to a private or loopback address, when submitted, then creation is rejected
 - [ ] Given a generated code that collides with an existing row, when insertion fails, then generation retries up to 5 times before returning an error
 
@@ -359,7 +359,8 @@ So that an abusive destination stops resolving before it damages the domain's re
 | FR-22 | Hourly Safe Browsing re-scan of the last 30 days of active links, with auto-takedown and auto-ban of new or repeat-offender owners | P0 |
 | FR-23 | Operator can lift a ban; links taken down by it stay down until reviewed | P1 |
 | FR-24 | Whitelisted users have no daily quota; all other controls still apply | P1 |
-| FR-28 | `GET /` on the redirect domain (`afh.my.id/`, no code) answers 302 to the app (`https://app.afh.my.id/`, configurable as `APP_URL`). Temporary, so a landing page can replace it later. Short codes are unaffected. | P2 |
+| FR-28 | `GET /` on the redirect domain (`afhs.my.id/`, no code) answers 302 to the app (`https://app.afhs.my.id/`, configurable as `APP_URL`). Temporary, so a landing page can replace it later. Short codes are unaffected. | P2 |
+| FR-29 | The legacy domain `afh.my.id` (blocked in some networks) permanently redirects to the same path and query on `afhs.my.id`: 301 for the redirect host, 308 for `app.afh.my.id` → `app.afhs.my.id`. Done in Caddy; links and QR codes shared before the move keep working wherever the old domain is reachable. The old domain stays registered, renewed, and in DNS indefinitely, and stays on the own-domain list (FR loop prevention). | P0 |
 | FR-27 | Light and dark theme on every page. Default follows the device setting; a sun/moon icon toggle switches it and the choice is remembered in that browser (switching back to the device's theme forgets it). No flash of the wrong theme on load. QR codes stay black on white. | P2 |
 | FR-26 | Redirects served are counted per link per UTC day in `link_clicks_daily`: counts only, no visitor identifiers; the redirect path does no extra I/O (in-memory counter, flushed in batches each minute). Viewed by SQL for now; no UI. | P1 |
 | FR-25 | Owner can show a QR code for any of their links that isn't taken down, and download it as PNG and SVG; it encodes only the short URL and is generated in the browser | P1 |
@@ -408,7 +409,7 @@ This is the only metric that measures delivered value. A link that is created bu
 | Mean time to recovery | Alert fired — service healthy | < 30 min | Per incident |
 | Backup restore verification | Restore drill performed and passed | 1 per quarter | Quarterly |
 | Abuse incidents | Links disabled for abuse | 0 | Monthly |
-| Domain reputation | Safe Browsing status for `afh.my.id` | Clean | Weekly |
+| Domain reputation | Safe Browsing status for `afhs.my.id` and legacy `afh.my.id` | Clean | Weekly |
 
 ### 6.3 Instrumentation
 
@@ -432,8 +433,8 @@ Shortlink is one tenant on a shared single-host platform. A separate infrastruct
 flowchart LR
     V[Visitor] -->|GET /abc123| CD[Caddy<br/>TLS + host routing]
     C[Creator] -->|app UI| CD
-    CD -->|afh.my.id| API[shortlink-api<br/>Go]
-    CD -->|app.afh.my.id| WEB[shortlink-web<br/>Next.js]
+    CD -->|afhs.my.id| API[shortlink-api<br/>Go]
+    CD -->|app.afhs.my.id| WEB[shortlink-web<br/>Next.js]
     CD -->|azizhudaya.my.id| P[portfolio]
     WEB -->|/api/* via Caddy| API
     API --> PG[(Postgres<br/>db: shortlink)]
@@ -500,8 +501,9 @@ PLT-05 is the item most likely to cause a confusing first failure: the SQL file 
 
 | Hostname | Served by | Purpose |
 |---|---|---|
-| `afh.my.id` | `shortlink-api` | Public redirects — `GET /{code}` |
-| `app.afh.my.id` | `shortlink-web`, with `/api/*` — `shortlink-api` | Creation and management UI |
+| `afhs.my.id` | `shortlink-api` | Public redirects — `GET /{code}` |
+| `app.afhs.my.id` | `shortlink-web`, with `/api/*` — `shortlink-api` | Creation and management UI |
+| `afh.my.id`, `app.afh.my.id` | Caddy only | Legacy domain — permanent redirect to `afhs.my.id` / `app.afhs.my.id`, path kept (FR-29) |
 
 Routing `/api/*` on the app hostname back to the API container makes every browser request same-origin. This removes CORS from the system entirely rather than configuring it — no preflight requests, no origin allowlist to maintain, no cross-origin cookie complications.
 
@@ -614,7 +616,7 @@ create index link_creations_user_time_idx on link_creations (user_id, created_at
 | `GET` | `/` | 302 to the app (v2.2, FR-28) |
 | `GET` | `/healthz` | 200 with process and database status |
 
-**Authentication** — all on `app.afh.my.id/api`
+**Authentication** — all on `app.afhs.my.id/api`
 
 | Method | Path | Response |
 |---|---|---|
@@ -646,7 +648,7 @@ POST /api/links
 201 Created
 {
   "code": "cv",
-  "short_url": "https://afh.my.id/cv",
+  "short_url": "https://afhs.my.id/cv",
   "long_url": "https://example.com/some/very/long/path?with=query",
   "is_custom": true,
   "created_at": "2026-07-31T10:00:00Z"
@@ -822,7 +824,7 @@ Documented procedures, each verified once before GA:
 
 ### 13.1 The risk
 
-Every public URL shortener is found by bots and used to wrap phishing destinations. The consequence is not merely bad links: if Google Safe Browsing blocks `afh.my.id`, Chrome and Firefox show a full-page interstitial for **the entire domain including `app.afh.my.id`**, and delisting is slow. A single successful abuse campaign can therefore take the whole product offline for days, and takes the co-hosted personal domain's reputation with it if they were ever associated.
+Every public URL shortener is found by bots and used to wrap phishing destinations. The consequence is not merely bad links: if Google Safe Browsing blocks `afhs.my.id`, Chrome and Firefox show a full-page interstitial for **the entire domain including `app.afhs.my.id`**, and delisting is slow. A single successful abuse campaign can therefore take the whole product offline for days, and takes the co-hosted personal domain's reputation with it if they were ever associated.
 
 This is why abuse controls appear in the requirements rather than the roadmap.
 
@@ -844,7 +846,7 @@ This is why abuse controls appear in the requirements rather than the roadmap.
 
 ### 13.3 Monitoring
 
-Safe Browsing status for `afh.my.id` is checked weekly, together with a `user list-recent` review of new accounts. Both are **mandatory** since registration opened (v2.1). Re-scan takedowns are logged (`rescan_takedown`) and optionally pushed to a webhook. A takedown request received through any channel is actioned first and investigated second — the reputational cost of a slow response exceeds the cost of disabling a link that turns out to be legitimate.
+Safe Browsing status for `afhs.my.id` is checked weekly, together with a `user list-recent` review of new accounts. Both are **mandatory** since registration opened (v2.1). Re-scan takedowns are logged (`rescan_takedown`) and optionally pushed to a webhook. A takedown request received through any channel is actioned first and investigated second — the reputational cost of a slow response exceeds the cost of disabling a link that turns out to be legitimate.
 
 ---
 
@@ -946,7 +948,8 @@ Stated explicitly so they are not rediscovered later as surprises.
 ## 18. Dependencies & Assumptions
 
 **Dependencies**
-- [ ] `afh.my.id` DNS: A records for apex and `app` pointing at the VPS
+- [ ] `afhs.my.id` DNS: A records for apex and `app` pointing at the VPS
+- [ ] Legacy `afh.my.id` DNS: apex and `app` A records still point at the VPS (Caddy needs them for TLS and the FR-29 redirect)
 - [ ] Ports 80 and 443 reachable for ACME certificate issuance
 - [ ] GHCR available for image storage and retrieval
 - [ ] External uptime monitoring service
@@ -998,6 +1001,7 @@ Stated explicitly so they are not rediscovered later as surprises.
 
 | Version | Date | Changes |
 |---|---|---|
+| 2.3 | 2026-10-30 | Domain moved from `afh.my.id` to `afhs.my.id` because the old domain is blocked in the operator's country. The old domain permanently redirects, path kept (FR-29). Short URLs are built from config, so existing links need no data migration; the OAuth redirect URI and authorized domain move to the new host. |
 | 1.0 | 2026-07-30 | Initial document. Scoped M0—M2, framed as a learning project with learning-verification gates. |
 | 2.2 | 2026-10-25 | The bare redirect domain (`afh.my.id/`) redirects to the app (FR-28, 302). |
 | 2.1 | 2026-10-24 | Google sign-in replaces email + password and invites; registration is open. Added compensating abuse controls (Safe Browsing on create and hourly re-scan, new-account quota, kill switch, ban/unban, whitelist), QR codes for short links (PNG/SVG download), FR-18–FR-25, daily click counts recorded in the database (FR-26), light/dark theme toggle (FR-27), owner deletion becomes a soft delete (`links.deleted_at`; codes stay reserved), schema and API updates, and the open-sign-up risk. FR-08/FR-09 void. See `M2-IMPLEMENTATION-PLAN.md` §0. |

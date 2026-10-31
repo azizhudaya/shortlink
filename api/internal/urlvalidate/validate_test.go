@@ -9,7 +9,7 @@ import (
 // newTestValidator stubs DNS so the private-address branch is exercised
 // without depending on real resolution.
 func newTestValidator(resolved map[string][]string) *Validator {
-	v := New([]string{"afh.my.id", "app.afh.my.id"})
+	v := New([]string{"afhs.my.id", "app.afhs.my.id", "afh.my.id", "app.afh.my.id"})
 	v.resolve = func(host string) ([]net.IP, error) {
 		addrs, ok := resolved[host]
 		if !ok {
@@ -54,9 +54,13 @@ func TestValidate(t *testing.T) {
 		{name: "file scheme", input: "file:///etc/passwd", want: ErrBadScheme},
 
 		// Loop prevention.
-		{name: "own apex", input: "https://afh.my.id/abc", want: ErrOwnDomain},
-		{name: "own app host", input: "https://app.afh.my.id/", want: ErrOwnDomain},
-		{name: "own host mixed case", input: "https://AFH.MY.ID/abc", want: ErrOwnDomain},
+		{name: "own apex", input: "https://afhs.my.id/abc", want: ErrOwnDomain},
+		{name: "own app host", input: "https://app.afhs.my.id/", want: ErrOwnDomain},
+		{name: "own host mixed case", input: "https://AFHS.MY.ID/abc", want: ErrOwnDomain},
+		// The legacy domain redirects to the new one (FR-29), so a link to it
+		// would loop back into the service just the same.
+		{name: "legacy apex", input: "https://afh.my.id/abc", want: ErrOwnDomain},
+		{name: "legacy app host", input: "https://app.afh.my.id/", want: ErrOwnDomain},
 
 		// SSRF / internal-target rejection.
 		{name: "loopback literal", input: "http://127.0.0.1:8080", want: ErrPrivateAddr},

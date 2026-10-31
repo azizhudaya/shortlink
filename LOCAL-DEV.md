@@ -78,7 +78,7 @@ cd ../web && npm install   # generates package-lock.json
 cd api
 set -a; source ~/.config/shortlink/dev.env; set +a
 export DATABASE_URL='postgres://shortlink_api:devpassword@localhost:5432/shortlink?sslmode=disable'
-export PUBLIC_HOSTNAMES='afh.my.id,app.afh.my.id'
+export PUBLIC_HOSTNAMES='afhs.my.id,app.afhs.my.id'
 # Sign-in over http://localhost: drop the __Host- prefix and Secure flag, and
 # send Google back through the Next dev proxy.
 export INSECURE_DEV_COOKIES=1
@@ -134,7 +134,7 @@ else, so `localhost:3000/{code}` will 404 from Next, not from the API.
 private addresses (FR-03), so `http://localhost:3000/foo` returns 400. This is
 correct. Use real public URLs when testing the happy path.
 
-**Created links display as `https://afh.my.id/{code}`.** `shortURL()` builds
+**Created links display as `https://afhs.my.id/{code}`.** `shortURL()` builds
 from the first entry of `PUBLIC_HOSTNAMES`, so the returned link is not
 clickable locally — copy the `code` and hit `localhost:8080/{code}` instead.
 Setting `PUBLIC_HOSTNAMES='localhost:8080,...'` makes links clickable but then
@@ -161,7 +161,7 @@ curl -s -X POST $B/api/links -H 'Content-Type: application/json' \
 
 # Story 1 — rejections
 for u in 'javascript:alert(1)' 'data:text/html,<x>' 'file:///etc/passwd' \
-         'https://afh.my.id/abc' 'http://127.0.0.1:3000' \
+         'https://afhs.my.id/abc' 'http://127.0.0.1:3000' \
          'http://169.254.169.254/latest/meta-data'; do
   curl -s -X POST $B/api/links -H 'Content-Type: application/json' \
     -d "{\"url\":\"$u\"}"; echo

@@ -53,7 +53,7 @@ function CreateForm() {
   return (
     <div className="wrap">
       <h1>
-        Shortlink. <span className="highlight">Short links on afh.my.id.</span>
+        Shortlink. <span className="highlight">Short links on afhs.my.id.</span>
       </h1>
 
       <form onSubmit={onSubmit}>

@@ -19,7 +19,7 @@ const (
 )
 
 // Cookie names. __Host- makes the browser refuse a Domain attribute, so the
-// redirect apex afh.my.id never receives either cookie (PRD §14).
+// redirect apex afhs.my.id never receives either cookie (PRD §14).
 func (s *Server) sessionCookieName() string { return s.cookiePrefix() + "sl_session" }
 func (s *Server) oauthCookieName() string   { return s.cookiePrefix() + "sl_oauth" }
 

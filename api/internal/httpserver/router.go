@@ -80,8 +80,8 @@ func NewServer(cfg config.Config, st store.Store, as store.AuthStore, idp Identi
 
 // Routes registers every path this service serves.
 //
-// One mux serves both hostnames: Caddy routes afh.my.id here for redirects
-// and app.afh.my.id/api/* here for the API, so the API is same-origin
+// One mux serves both hostnames: Caddy routes afhs.my.id here for redirects
+// and app.afhs.my.id/api/* here for the API, so the API is same-origin
 // with the UI and CORS never enters the system.
 //
 // Go 1.22's ServeMux prefers a literal pattern over an overlapping wildcard,
@@ -112,9 +112,9 @@ func (s *Server) Routes() http.Handler {
 }
 
 // shortURL builds the public form of a code. The first configured hostname
-// is the redirect hostname (afh.my.id), not the app hostname.
+// is the redirect hostname (afhs.my.id), not the app hostname.
 func (s *Server) shortURL(code string) string {
-	host := "afh.my.id"
+	host := "afhs.my.id"
 	if len(s.cfg.PublicHostnames) > 0 {
 		host = s.cfg.PublicHostnames[0]
 	}

@@ -117,7 +117,7 @@ func TestCreateStampsOwnerViaHTTP(t *testing.T) {
 	e := newEnv(t)
 	a := e.account(t, "a")
 	link := e.mustCreate(t, a, `{"url":"https://example.com/x","custom_alias":"mine"}`)
-	if link.Code != "mine" || link.ShortURL != "https://afh.my.id/mine" {
+	if link.Code != "mine" || link.ShortURL != "https://afhs.my.id/mine" {
 		t.Fatalf("created %+v", link)
 	}
 	if n := e.count(t, `SELECT count(*) FROM links l JOIN users u ON u.id = l.user_id WHERE l.short_code = 'mine' AND u.google_sub = 'a'`); n != 1 {
@@ -245,7 +245,7 @@ func TestListOnlyOwn(t *testing.T) {
 		t.Fatalf("list = %+v", got)
 	}
 	l := got.Links[0]
-	if l.ShortURL != "https://afh.my.id/alpha" || l.LongURL != "https://example.com/a" || !l.IsCustom || l.Status != "active" {
+	if l.ShortURL != "https://afhs.my.id/alpha" || l.LongURL != "https://example.com/a" || !l.IsCustom || l.Status != "active" {
 		t.Fatalf("item = %+v", l)
 	}
 	if resp := e.request(t, "GET", "/api/links", "", nil); resp.StatusCode != http.StatusUnauthorized {

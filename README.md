@@ -1,12 +1,12 @@
 # shortlink
 
-Public application repository for the `afh.my.id` URL shortener: the Go API
+Public application repository for the `afhs.my.id` URL shortener: the Go API
 that serves redirects and the Next.js UI that creates links. Both ship
 together, so both live here.
 
 ```
 api/     Go service — redirects (GET /{code}), creation API (/api/*), migrations
-web/     Next.js creation UI served at app.afh.my.id
+web/     Next.js creation UI served at app.afhs.my.id
 docs/    canonical PRD and the M1 implementation plan
 docker-compose.yml   both containers; networks come from afh-infra
 LOCAL-DEV.md         running the whole stack on a laptop
@@ -61,7 +61,7 @@ Sign-in is **Google only** and registration is **open**, so the abuse controls
 in `docs/PRD-shortlink-v2.md` §13.2 carry the domain's reputation: Safe Browsing
 on every create (fails closed), an hourly Safe Browsing re-scan with automatic
 takedown, a new-account daily quota, a sign-up kill switch, and one-command
-bans. M1's Caddy basic auth on `app.afh.my.id` stays on until the M2 gate passes
+bans. M1's Caddy basic auth on `app.afhs.my.id` stays on until the M2 gate passes
 on the live domain (`docs/M2-IMPLEMENTATION-PLAN.md`, Task 13).
 
 ## Operator runbook
@@ -74,7 +74,7 @@ All commands run on the VPS in `/srv/shortlink`. `SL` below is
 2. Find the accounts: `$SL user list-recent -days 2`.
 3. Ban each abuser: `$SL user disable -email x -reason "phishing wave" -actor aziz` (sessions ended, every link taken down).
 4. Sweep now rather than waiting for the hour: `$SL links rescan`.
-5. Check the Safe Browsing status of `afh.my.id` (Transparency Report / Search Console). Remove `SIGNUPS_OPEN` and recreate when clean.
+5. Check the Safe Browsing status of `afhs.my.id` (Transparency Report / Search Console). Remove `SIGNUPS_OPEN` and recreate when clean.
 
 **Single takedown**: `$SL takedown -code X -reason "…" -actor aziz`. If the
 app is down, over the SSH tunnel:
@@ -113,14 +113,15 @@ value in Google Cloud Console, put it in `.env`, `docker compose up -d
 shortlink-api`, then revoke the old one.
 
 **Weekly** (mandatory since registration opened): `$SL user list-recent` and
-the Safe Browsing status of `afh.my.id`.
+the Safe Browsing status of `afhs.my.id`.
 
 ## Hostname routing
 
 | Hostname | Container | Purpose |
 |---|---|---|
-| `afh.my.id` | `shortlink-api` | Public redirects, `GET /{code}` |
-| `app.afh.my.id` | `shortlink-web`, with `/api/*` → `shortlink-api` | Creation UI |
+| `afhs.my.id` | `shortlink-api` | Public redirects, `GET /{code}` |
+| `app.afhs.my.id` | `shortlink-web`, with `/api/*` → `shortlink-api` | Creation UI |
+| `afh.my.id`, `app.afh.my.id` | Caddy only | Legacy domain: permanent redirect to the same path on `afhs.my.id` / `app.afhs.my.id` (FR-29) |
 
 Caddy proxying `/api/*` on the app hostname to the API container makes every
 browser request same-origin, so CORS never enters the system.

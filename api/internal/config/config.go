@@ -6,10 +6,10 @@ import (
 )
 
 // DefaultGoogleRedirectURL is the production OAuth callback (D17).
-const DefaultGoogleRedirectURL = "https://app.afh.my.id/api/auth/google/callback"
+const DefaultGoogleRedirectURL = "https://app.afhs.my.id/api/auth/google/callback"
 
 // DefaultAppURL is where the bare redirect domain sends visitors (FR-28).
-const DefaultAppURL = "https://app.afh.my.id"
+const DefaultAppURL = "https://app.afhs.my.id"
 
 // Config is loaded entirely from the environment (set by docker-compose.yml
 // / afh-infra's platform contract), never from a file. Secrets come from the

@@ -1,7 +1,7 @@
 # web — Next.js UI
 
 The frontend component of the `shortlink` repo: the link-creation UI served at
-`app.afh.my.id`.
+`app.afhs.my.id`.
 
 Repo-level context — the platform contract, hostname routing, deploy, and the
 repository model — is in [`../README.md`](../README.md). The canonical product
@@ -9,8 +9,8 @@ spec is [`../docs/PRD-shortlink-v2.md`](../docs/PRD-shortlink-v2.md).
 
 ## How it talks to the API
 
-It doesn't, directly. Caddy serves this app at `app.afh.my.id` and proxies
-`app.afh.my.id/api/*` to the `shortlink-api` container (PRD §7.3), so the
+It doesn't, directly. Caddy serves this app at `app.afhs.my.id` and proxies
+`app.afhs.my.id/api/*` to the `shortlink-api` container (PRD §7.3), so the
 browser's `fetch('/api/links')` is **same-origin**. There is no API base URL to
 configure, no CORS preflight, no origin allowlist, and — once M2 adds session
 cookies — no cross-origin cookie handling.
